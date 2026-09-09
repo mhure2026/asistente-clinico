@@ -1,4 +1,5 @@
-import os
+
+               import os
 import time
 import streamlit as st
 import chromadb
@@ -6,6 +7,7 @@ import chromadb.utils.embedding_functions as embedding_functions
 from google import genai
 from PIL import Image
 from fpdf import FPDF
+from io import BytesIO
 
 st.set_page_config(
     page_title="Asistente Clínico de Optometría Avanzada",
@@ -15,10 +17,30 @@ st.set_page_config(
 )
 
 # ==========================================
-# 🔒 SISTEMA DE ACCESO PRIVADO (CON CONTRASEÑA)
+# 🔒 BLINDAJE Y PROTECCIÓN INTELECTUAL (CSS)
 # ==========================================
-# Definí tu contraseña activa (la que le pasás al colega tras el pago mensual)
-# Podés cambiarla fácilmente o adaptarla mes a mes (ej: "zerzer2026", "optica30", etc.)
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stButton>button {
+        width: 100%;
+        background-color: #0d6efd;
+        color: white;
+        font-weight: bold;
+        border-radius: 6px;
+    }
+    .stButton>button:hover {
+        background-color: #0b5ed7;
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 🔒 SISTEMA DE ACCESO PRIVADO (CONTRASEÑA)
+# ==========================================
 CONTRASENIA_VALIDA = "zerzer2026"
 
 if "autenticado" not in st.session_state:
@@ -28,26 +50,26 @@ if not st.session_state.autenticado:
     st.markdown("<br><br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("## 🔐 Acceso Restringido - Profesionales")
-        st.info("Este sistema es de uso exclusivo para colegas suscriptores de Óptica Zerzer. Ingrese su contraseña mensual para continuar.")
+        st.markdown("## 🔐 Óptica Zerzer - Acceso Colegas")
+        st.info("Sistema exclusivo para profesionales suscriptores. Ingrese su contraseña mensual.")
         
         input_pass = st.text_input("Contraseña de acceso:", type="password")
-        if st.button("Ingresar al Sistema", use_container_width=True):
+        if st.button("Ingresar al Sistema"):
             if input_pass == CONTRASENIA_VALIDA:
                 st.session_state.autenticado = True
                 st.rerun()
             else:
-                st.error("❌ Contraseña incorrecta. Verifique sus datos o comuníquese con Óptica Zerzer.")
-    st.stop() # Detiene la ejecución aquí si no está autenticado
+                st.error("❌ Contraseña incorrecta. Verifique sus datos.")
+    st.stop()
 
 # ==========================================
-# 🛠️ APLICACIÓN PRINCIPAL (UNA VEZ ADENTRO)
+# 🛠️ PANEL LATERAL Y NAVEGACIÓN
 # ==========================================
-
 with st.sidebar:
-    st.title("Panel Clínico")
+    st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=60)
+    st.title("Óptica Zerzer")
+    st.markdown("*Asistente Clínico Profesional*")
     
-    # Botón para cerrar sesión si lo deseas
     if st.button("🚪 Cerrar Sesión"):
         st.session_state.autenticado = False
         st.rerun()
@@ -68,14 +90,14 @@ with st.sidebar:
     )
     
     uploaded_images = st.file_uploader(
-        "📷 Subir imágenes clínicas (Máximo 2 fotos)", 
+        "📷 Subir imágenes clínicas (Máx. 2)", 
         type=["png", "jpg", "jpeg"], 
         accept_multiple_files=True,
-        help="Subí hasta 2 imágenes clave."
+        help="Subí hasta 2 imágenes clave de topografía o córnea."
     )
     
     if uploaded_images and len(uploaded_images) > 2:
-        st.warning("⚠️ Máximo 2 fotos permitidas para evitar colapsos.")
+        st.warning("⚠️ Máximo 2 fotos permitidas.")
         uploaded_images = uploaded_images[:2]
     
     paciente_info = st.text_area(
@@ -83,15 +105,18 @@ with st.sidebar:
         placeholder="Ej: K1: 44.00 @ 90, K2: 47.50 @ 180...",
         height=140
     )
+    st.markdown("---")
+    st.caption("© Óptica Zerzer - Propiedad Protegida")
 
-st.title("👁️‍🗨️ Sistema Experto de Apoyo Clínico en Optometría")
+# ==========================================
+# CUERPO PRINCIPAL
+# ==========================================
+st.title("👁️‍🗨️ Panel de Resolución de Casos Clínicos")
 
-# --- CARTEL AMIGABLE EXPLICATIVO ---
 st.info(
-    "💡 **Nota sobre el análisis de imágenes clínicas y topografías:**\n\n"
-    "Debido a la alta complejidad y densidad de datos que contienen los mapas topográficos y las imágenes oculares, "
-    "el sistema realiza una inspección visual detallada que puede tomar entre **2 a 3 minutos** en procesar la consulta. "
-    "¡La precisión del diagnóstico y los parámetros sugeridos valen totalmente la espera!",
+    "💡 **Nota sobre el análisis de imágenes clínicas:**\n\n"
+    "Para garantizar un diagnóstico de alta precisión basado exclusivamente en la bibliografía de la solapa activa, "
+    "el sistema demanda entre **2 a 3 minutos** de procesamiento profundo. ¡Agradecemos su paciencia!",
     icon="⏱️"
 )
 
@@ -101,6 +126,7 @@ if not api_key:
     st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral para comenzar.")
     st.stop()
 
+# Inicialización correcta del cliente de Gemini
 client = genai.Client(api_key=api_key)
 
 @st.cache_resource
@@ -142,7 +168,7 @@ if prompt or uploaded_images:
                     st.image(Image.open(img_file), caption=f"Foto {idx+1}", width=200)
 
     with st.chat_message("assistant"):
-        with st.spinner("🔍 Analizando mapas topográficos y contrastando con literatura científica (Esto puede tomar unos minutos)..."):
+        with st.spinner("🔍 Analizando mapas topográficos y contrastando con literatura científica (2-3 minutos)..."):
             
             nombre_col_actual = mapeo_colecciones.get(modo_consulta, "colleccion_general")
             coleccion_activa = chroma_client.get_or_create_collection(name=nombre_col_actual, embedding_function=emb_fn)
@@ -172,6 +198,7 @@ if prompt or uploaded_images:
             respuesta_modelo = None
             for intento in range(3):
                 try:
+                    # Corrección clave para la SDK moderna de google-genai
                     response = client.models.generate_content(
                         model='gemini-3.6-flash',
                         contents=contents_payload,
@@ -187,7 +214,7 @@ if prompt or uploaded_images:
             st.markdown(respuesta_modelo)
             st.session_state.messages.append({"role": "assistant", "content": respuesta_modelo})
 
-            # --- GENERACIÓN DE PDF ---
+            # --- GENERACIÓN DE PDF Y DESCARGA ---
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 class PDF(FPDF):
                     def header(self):
@@ -209,6 +236,6 @@ if prompt or uploaded_images:
                     st.download_button(
                         label="📥 Descargar Informe en PDF para Imprimir",
                         data=pdf_file,
-                        file_name="informe_optometrico.pdf",
+                        file_name="informe_optometrico_zerzer.pdf",
                         mime="application/pdf"
                     )
