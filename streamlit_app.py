@@ -6,6 +6,7 @@ import urllib.request
 import streamlit as st
 from PIL import Image
 from io import BytesIO
+from weasyprint import HTML
 
 st.set_page_config(
     page_title="Asistente Clínico | Óptica Zerzer",
@@ -14,14 +15,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ----------------------------------------------------
+# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
+# ----------------------------------------------------
 CLAVE_ACCESO = "optica2026"
 
-# Aquí el sistema busca la clave de forma invisible en el cofre seguro
+# Obtención segura de la API Key desde el cofre privado de Streamlit Cloud (o entorno local)
 try:
     API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "")
+# ----------------------------------------------------
 
+# Estética y blindaje profesional
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -92,6 +98,7 @@ if validar_acceso():
 
         st.markdown("### 📂 Seleccioná la Categoría / Solapa")
         
+        # Las 6 áreas clínicas especializadas
         categoria = st.selectbox(
             "Área especializada a consultar:",
             [
@@ -228,16 +235,73 @@ if validar_acceso():
                 
                 st.markdown(resultado_markdown)
                 
-                st.markdown("<br>", unsafe_allow_html=True)
-                buffer = BytesIO()
-                buffer.write(resultado_markdown.encode('utf-8'))
-                buffer.seek(0)
+                # Generación de PDF profesional usando WeasyPrint
+                html_contenido = f"""
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        @page {{
+                            size: A4;
+                            margin: 20mm 15mm;
+                            background-color: #faf8f5;
+                        }}
+                        * {{ box-sizing: border-box; }}
+                        body {{
+                            font-family: Arial, sans-serif;
+                            font-size: 11pt;
+                            color: #2b2b2b;
+                            line-height: 1.5;
+                            margin: 0;
+                            padding: 0;
+                        }}
+                        .header-box {{
+                            background-color: #0d6efd;
+                            color: white;
+                            padding: 20px;
+                            border-radius: 6px;
+                            margin-bottom: 20px;
+                        }}
+                        h1 {{ font-size: 20pt; margin: 0 0 5px 0; }}
+                        h2, h3 {{ color: #0d6efd; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; margin-top: 20px; }}
+                        p {{ margin: 8px 0; }}
+                        ul, ol {{ margin: 8px 0; padding-left: 20px; }}
+                        .footer {{
+                            margin-top: 40px;
+                            font-size: 9pt;
+                            color: #6c757d;
+                            text-align: center;
+                            border-top: 1px solid #dee2e6;
+                            padding-top: 10px;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header-box">
+                        <h1>Reporte Clínico Oficial - Óptica Zerzer</h1>
+                        <p style="margin:0; font-size: 12pt;">Área / Solapa Evaluada: {categoria}</p>
+                    </div>
+                    <div>
+                        {respuesta_modelo.replace(chr(10), '<br>')}
+                    </div>
+                    <div class="footer">
+                        Aviso legal: Este reporte es una herramienta de asistencia profesional generada por el Asistente Clínico de Óptica Zerzer. Queda prohibida la reproducción total o parcial de la metodología y estructura de esta plataforma.
+                    </div>
+                </body>
+                </html>
+                """
                 
+                pdf_buffer = BytesIO()
+                HTML(string=html_contenido).write_pdf(pdf_buffer)
+                pdf_bytes = pdf_buffer.getvalue()
+                
+                st.markdown("<br>", unsafe_allow_html=True)
                 st.download_button(
-                    label="📥 Descargar Reporte Clínico (Formato Texto / PDF)",
-                    data=buffer,
-                    file_name=f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.txt",
-                    mime="text/plain"
+                    label="📥 Descargar Reporte Clínico en PDF Oficial",
+                    data=pdf_bytes,
+                    file_name=f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.pdf",
+                    mime="application/pdf"
                 )
             else:
                 st.error(respuesta_modelo)
