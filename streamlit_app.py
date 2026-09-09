@@ -355,11 +355,11 @@ if validar_acceso():
                                 res_data = json.loads(response.read().decode('utf-8'))
                                 respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
                                 break
-                    except Exception as e:
-                        if intento == 2:
-                            respuesta_modelo = f"⚠️ Error temporal: {e}"
-                        else:
-                            time.sleep(2)
+                        except Exception as e:
+                            if intento == 2:
+                                respuesta_modelo = f"⚠️ Error temporal: {e}"
+                            else:
+                                time.sleep(2)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
