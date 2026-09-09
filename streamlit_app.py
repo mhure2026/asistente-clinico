@@ -1,51 +1,57 @@
 import streamlit as st
 
+# Configuración de la página
 st.set_page_config(
     page_title="Asistente Clínico Optométrico",
     page_icon="👁️",
-    layout="centered",
+    layout="centered"
 )
 
-st.title("👁️ Asistente Clínico Optométrico")
-st.markdown("### Herramienta de consulta y rigor científico para tu gabinete")
+# Contraseña de acceso mensual (puedes cambiarla cuando gustes)
+CLAVE_ACCESO = "optica2026"
 
-clave_ingresada = st.text_input(
-    "Ingresá tu contraseña de acceso mensual:", type="password"
-)
-CLAVE_VALIDA = "zerzer2026"
+def validar_acceso():
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
 
-if clave_ingresada == CLAVE_VALIDA:
-    st.success("¡Acceso autorizado! Bienvenido colega.")
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Asistente Clínico Optométrico")
+        st.write("Herramienta de consulta y rigor científico para tu gabinete")
+        
+        password = st.text_input("Ingresá tu contraseña de acceso mensual:", type="password")
+        
+        if st.button("Ingresar"):
+            if password == CLAVE_ACCESO:
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta. Verificá los datos.")
+        return False
+    return True
+
+# Ejecutar validación de seguridad
+if validar_acceso():
+    st.title("👁️ Asistente Clínico Optométrico")
+    st.write("Herramienta de consulta y rigor científico para tu gabinete")
+
     st.markdown("---")
-    st.markdown("#### 📚 Consulta de Casos y Protocolos")
 
-    tipo_caso = st.selectbox(
+    # Selección de categorías correspondientes a las carpetas de la biblioteca
+    opcion = st.selectbox(
         "Seleccioná el tipo de análisis:",
         [
             "Topografía compleja / Queratocono",
             "Adaptación de Lentes Rígidas (RGP)",
-            "Baja Visión y Terapia Visual",
-        ],
+            "Baja Visión",
+            "General y Clínica",
+            "Neurología",
+            "Pediatría",
+            "Terapia Visual"
+        ]
     )
 
-    consulta = st.text_area(
-        "Describí los valores, parámetros o dudas del caso clínico:"
-    )
+    st.markdown("---")
 
     if st.button("Generar Análisis Clínico"):
-        if consulta:
-            st.info(
-                "Analizando parámetros bibliográficos y criterios de adaptación..."
-            )
-            st.markdown(
-                "**Criterio sugerido:** Basado en la bibliografía avanzada de adaptación en córneas irregulares, se recomienda priorizar el control de la sagital y evaluar el apoyo en la zona intermedia para evitar marcas epiteliales."
-            )
-        else:
-            st.warning("Por favor, ingresa los datos del caso.")
-
-elif clave_ingresada:
-    st.error(
-        "Contraseña incorrecta o membresía vencida. Recordá verificar tu pago por WhatsApp."
-    )
-else:
-    st.info("Por favor, introduce tu contraseña para habilitar las consultas.")
+        st.success(f"Cargando protocolos y documentación para la sección: **{opcion}**...")
+        # Acá se procesarían los documentos de la carpeta correspondiente
