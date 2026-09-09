@@ -6,7 +6,6 @@ import urllib.request
 import streamlit as st
 from PIL import Image
 from io import BytesIO
-from weasyprint import HTML
 
 st.set_page_config(
     page_title="Asistente Clínico | Óptica Zerzer",
@@ -225,7 +224,7 @@ if validar_acceso():
                 resultado_markdown = f"""
 ### 📋 Reporte Clínico Oficial - Óptica Zerzer
 * **Área / Solapa Evaluada:** {categoria}
-* **Validación de Sesión:** Activa (Colega Autorizado)
+* **Validación de Sesión:** Activa (Colega Authorized)
 
 ---
 {respuesta_modelo}
@@ -235,54 +234,53 @@ if validar_acceso():
                 
                 st.markdown(resultado_markdown)
                 
-                # Generación de PDF profesional usando WeasyPrint
+                # Generación de documento prolijo en formato HTML profesional (listo para guardar como PDF desde el navegador)
                 html_contenido = f"""
                 <!DOCTYPE html>
                 <html lang="es">
                 <head>
                     <meta charset="UTF-8">
+                    <title>Reporte Clínico - Óptica Zerzer</title>
                     <style>
-                        @page {{
-                            size: A4;
-                            margin: 20mm 15mm;
-                            background-color: #faf8f5;
-                        }}
-                        * {{ box-sizing: border-box; }}
                         body {{
                             font-family: Arial, sans-serif;
-                            font-size: 11pt;
+                            max-width: 800px;
+                            margin: 40px auto;
+                            padding: 30px;
+                            background-color: #ffffff;
                             color: #2b2b2b;
-                            line-height: 1.5;
-                            margin: 0;
-                            padding: 0;
+                            line-height: 1.6;
+                            border: 1px solid #e0e0e0;
+                            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+                            border-radius: 8px;
                         }}
-                        .header-box {{
+                        .header {{
                             background-color: #0d6efd;
                             color: white;
                             padding: 20px;
                             border-radius: 6px;
-                            margin-bottom: 20px;
+                            margin-bottom: 25px;
                         }}
-                        h1 {{ font-size: 20pt; margin: 0 0 5px 0; }}
-                        h2, h3 {{ color: #0d6efd; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; margin-top: 20px; }}
-                        p {{ margin: 8px 0; }}
-                        ul, ol {{ margin: 8px 0; padding-left: 20px; }}
+                        h1 {{ margin: 0; font-size: 22px; }}
+                        p {{ margin: 5px 0; font-size: 14px; }}
+                        .content {{ margin-top: 20px; font-size: 15px; }}
+                        h3 {{ color: #0d6efd; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; margin-top: 25px; }}
                         .footer {{
                             margin-top: 40px;
-                            font-size: 9pt;
+                            font-size: 11px;
                             color: #6c757d;
                             text-align: center;
                             border-top: 1px solid #dee2e6;
-                            padding-top: 10px;
+                            padding-top: 15px;
                         }}
                     </style>
                 </head>
                 <body>
-                    <div class="header-box">
-                        <h1>Reporte Clínico Oficial - Óptica Zerzer</h1>
-                        <p style="margin:0; font-size: 12pt;">Área / Solapa Evaluada: {categoria}</p>
+                    <div class="header">
+                        <h1>📋 Reporte Clínico Oficial - Óptica Zerzer</h1>
+                        <p><strong>Área / Solapa Evaluada:</strong> {categoria}</p>
                     </div>
-                    <div>
+                    <div class="content">
                         {respuesta_modelo.replace(chr(10), '<br>')}
                     </div>
                     <div class="footer">
@@ -292,16 +290,20 @@ if validar_acceso():
                 </html>
                 """
                 
-                pdf_buffer = BytesIO()
-                HTML(string=html_contenido).write_pdf(pdf_buffer)
-                pdf_bytes = pdf_buffer.getvalue()
-                
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.download_button(
-                    label="📥 Descargar Reporte Clínico en PDF Oficial",
-                    data=pdf_bytes,
-                    file_name=f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.pdf",
-                    mime="application/pdf"
-                )
+                
+                # Botón de descarga interactivo como documento prolijo
+                b64 = base64.b64encode(html_contenido.encode('utf-8')).decode('utf-8')
+                nombre_archivo = f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.html"
+                
+                href = f'''
+                <a href="data:text/html;base64,{b64}" download="{nombre_archivo}" style="text-decoration: none;">
+                    <div style="background-color: #0d6efd; color: white; padding: 0.7rem; text-align: center; font-weight: bold; border-radius: 6px; width: 100%;">
+                        📥 Descargar Reporte Clínico Profesional (Formato PDF / Impresión)
+                    </div>
+                </a>
+                '''
+                st.markdown(href, unsafe_allow_html=True)
+                st.info("💡 **Tip:** Al abrir el archivo descargado en tu computadora, presiono **Ctrl + P** (o Cmd + P en Mac) y elegí **'Guardar como PDF'** para obtener el documento impreso o digital perfecto.")
             else:
                 st.error(respuesta_modelo)
