@@ -1,8 +1,6 @@
 import os
 import time
 import streamlit as st
-import chromadb
-import chromadb.utils.embedding_functions as embedding_functions
 from google import genai
 from PIL import Image
 from io import BytesIO
@@ -132,7 +130,7 @@ if validar_acceso():
         st.title("🔬 Panel de Resolución de Casos Clínicos")
         st.markdown(
             "Bienvenido colega. Este espacio inteligente procesa sus parámetros e imágenes clínicas aplicando "
-            "estrictamente los protocolos y normativas bibliográficas de la solapa seleccionada para garantizarle "
+            "estrictamente los protocolos universitarios de la solapa seleccionada para garantizarle "
             "un rigor científico de máxima categoría en su gabinete."
         )
 
@@ -142,8 +140,8 @@ if validar_acceso():
             """
             <div class="info-box">
             <b>⏱️ Nota sobre tiempos de procesamiento:</b><br>
-            Para resguardar la máxima precisión analítica y realizar el cruce bibliográfico exclusivo, 
-            el sistema demanda <b>entre 2 y 3 minutos</b> de pensamiento profundo. Agradecemos su espera.
+            Para resguardar la máxima precisión analítica en el reporte, 
+            el sistema demanda <b>entre 1 y 2 minutos</b> de análisis detallado. Agradecemos su espera.
             </div>
             """, 
             unsafe_allow_html=True
@@ -153,56 +151,22 @@ if validar_acceso():
 
     api_key = api_key_input if api_key_input else os.environ.get("GEMINI_API_KEY")
 
-    @st.cache_resource
-    def obtener_motor_chroma():
-        try:
-            chroma_client = chromadb.PersistentClient(path="./base_datos_optometria")
-            emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-            return chroma_client, emb_fn
-        except Exception:
-            return None, None
-
-    chroma_client, emb_fn = obtener_motor_chroma()
-
-    mapeo_colecciones = {
-        "Topografía compleja / Queratocono": "colleccion_topografia",
-        "Adaptación de Lentes Rígidas (RGP)": "colleccion_rigidas",
-        "Baja Visión": "colleccion_baja_vision",
-        "General y Clínica": "colleccion_general",
-        "Neurología": "colleccion_neurologia",
-        "Pediatría": "colleccion_pediatria",
-        "Terapia Visual": "colleccion_terapia"
-    }
-
     if boton_analizar:
         if not api_key:
             st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico.")
         else:
-            with st.spinner(f"🔍 [Proceso Profundo] Analizando base bibliográfica para [{categoria}] y cruzando parámetros (Aprox. 2-3 min)..."):
+            with st.spinner(f"🔍 [Proceso Profundo] Analizando caso clínico para [{categoria}] con rigor universitario (Aprox. 1-2 min)..."):
                 
-                contexto = "Sin contexto específico adicional en la base local."
-                if chroma_client and emb_fn:
-                    try:
-                        nombre_col = mapeo_colecciones.get(categoria, "colleccion_general")
-                        coleccion_activa = chroma_client.get_or_create_collection(name=nombre_col, embedding_function=emb_fn)
-                        resultados = coleccion_activa.query(query_texts=[caso_texto if caso_texto else "Análisis general de imágenes"], n_results=1)
-                        documentos = resultados.get("documents", [[]])[0]
-                        if documentos:
-                            contexto = "\n\n".join(documentos)
-                    except Exception:
-                        contexto = "Base de datos local en inicialización estándar."
-
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista.
                 Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
 
                 Área Clínica Seleccionada: {categoria}
                 Parámetros y Datos Ingresados: {caso_texto}
-                Literatura Científica de Referencia: {contexto}
 
-                Estructura obligatoria que debe contener tu respuesta:
+                Estructura obligatoria que debe contener tu respuesta detallada:
                 1. 📋 **Resumen y Evaluación del Caso Clínico**: Análisis pormenorizado de los datos cuantitativos y cualitativos aportados.
                 2. 🔍 **Diagnóstico Diferencial y Biomecánica Ocular**: Interpretación profunda del problema visual, estado corneal, excentricidades o anomalías detectadas.
                 3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje**:
