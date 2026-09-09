@@ -1,7 +1,9 @@
 import os
 import time
+import json
+import base64
+import urllib.request
 import streamlit as st
-from google import genai
 from PIL import Image
 from io import BytesIO
 
@@ -12,6 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Estética y blindaje profesional
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -24,7 +27,7 @@ st.markdown("""
         color: white;
         font-weight: bold;
         border-radius: 6px;
-        padding: 0.5rem;
+        padding: 0.6rem;
     }
     .stButton>button:hover {
         background-color: #0b5ed7;
@@ -82,20 +85,21 @@ if validar_acceso():
             st.session_state.autenticado = False
             st.rerun()
 
-        api_key_input = st.text_input("🔑 Gemini API Key", type="password", help="Ingresá tu clave de API.")
+        api_key_input = st.text_input("🔑 Gemini API Key", type="password", help="Ingresá tu clave de API de Google Gemini.")
         
         st.markdown("---")
-        st.markdown("### 📂 Seleccioná la Categoría")
+        st.markdown("### 📂 Seleccioná la Categoría / Solapa")
+        
+        # Las 6 áreas clínicas especializadas
         categoria = st.selectbox(
-            "Área clínica a consultar:",
+            "Área especializada a consultar:",
             [
-                "Topografía compleja / Queratocono",
-                "Adaptación de Lentes Rígidas (RGP)",
-                "Baja Visión",
-                "General y Clínica",
-                "Neurología",
-                "Pediatría",
-                "Terapia Visual"
+                "🔬 Adaptación de Rígidas y Topografía",
+                "🎯 Terapia Visual",
+                "👁️ Baja Visión",
+                "👶 Pediatría",
+                "🧠 Neurología",
+                "📚 General y Clínica"
             ]
         )
         
@@ -103,7 +107,7 @@ if validar_acceso():
         st.markdown("### 📎 Insumos del Caso")
         
         imagenes_subidas = st.file_uploader(
-            "Subir imágenes (ej. Topografía corneal - Máx 2)", 
+            "Subir imágenes (ej. Topografía, mapas, córnea - Máx 2)", 
             type=["png", "jpg", "jpeg"], 
             accept_multiple_files=True
         )
@@ -114,8 +118,8 @@ if validar_acceso():
         
         caso_texto = st.text_area(
             "Detalle del caso clínico y parámetros:",
-            placeholder="Ej: K1 43.00 @ 90, K2 46.50 @ 180. Agudeza visual, síntomas...",
-            height=120
+            placeholder="Ej: K1: 43.00 @ 90, K2: 46.50 @ 180, AV, síntomas, excentricidad...",
+            height=130
         )
         
         st.markdown("<br>", unsafe_allow_html=True)
@@ -129,9 +133,9 @@ if validar_acceso():
     with col_main_1:
         st.title("🔬 Panel de Resolución de Casos Clínicos")
         st.markdown(
-            "Bienvenido colega. Este espacio inteligente procesa sus parámetros e imágenes clínicas aplicando "
-            "estrictamente los protocolos universitarios de la solapa seleccionada para garantizarle "
-            "un rigor científico de máxima categoría en su gabinete."
+            "Bienvenido colega. Este asistente inteligente procesa los parámetros y las imágenes clínicas aplicando "
+            "rigurosos protocolos universitarios y bibliografía avanzada de la solapa seleccionada para ofrecerle "
+            "un diagnóstico clínico profundo, preciso y con opciones terapéuticas claras para su gabinete."
         )
 
     with col_main_2:
@@ -139,9 +143,9 @@ if validar_acceso():
         st.markdown(
             """
             <div class="info-box">
-            <b>⏱️ Nota sobre tiempos de procesamiento:</b><br>
-            Para resguardar la máxima precisión analítica en el reporte, 
-            el sistema demanda <b>entre 1 y 2 minutos</b> de análisis detallado. Agradecemos su espera.
+            <b>⏱️ Nota sobre el análisis profundo:</b><br>
+            Para garantizar un reporte exhaustivo, fundamentado y de máxima calidad académica, 
+            el sistema procesa el caso en profundidad durante <b>1 a 2 minutos</b>. Agradecemos su espera.
             </div>
             """, 
             unsafe_allow_html=True
@@ -153,58 +157,69 @@ if validar_acceso():
 
     if boton_analizar:
         if not api_key:
-            st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral.")
+            st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral para activar el motor clínico.")
         elif not imagenes_subidas and not caso_texto.strip():
-            st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico.")
+            st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico en texto.")
         else:
-            with st.spinner(f"🔍 [Proceso Profundo] Analizando caso clínico para [{categoria}] con rigor universitario (Aprox. 1-2 min)..."):
+            with st.spinner(f"🔍 [Análisis Académico en Curso] Cruzando parámetros bibliográficos para [{categoria}] (Aprox. 1-2 min)..."):
                 
+                # Definición de directrices expertas según la solapa activa
                 prompt_sistema = f"""
-                Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista.
+                Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
                 Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
 
                 Área Clínica Seleccionada: {categoria}
-                Parámetros y Datos Ingresados: {caso_texto}
+                Parámetros y Datos Cuantitativos/Cualitativos Ingresados: {caso_texto}
 
-                Estructura obligatoria que debe contener tu respuesta detallada:
-                1. 📋 **Resumen y Evaluación del Caso Clínico**: Análisis pormenorizado de los datos cuantitativos y cualitativos aportados.
-                2. 🔍 **Diagnóstico Diferencial y Biomecánica Ocular**: Interpretación profunda del problema visual, estado corneal, excentricidades o anomalías detectadas.
+                El informe debe redactarse con un tono formal, médico-optométrico y sumamente claro. Debe contener obligatoriamente la siguiente estructura profesional:
+
+                1. 📋 **Resumen y Evaluación del Caso Clínico**: Análisis pormenorizado de los datos aportados, correlacionándolos con la alteración visual o patológica de la solapa.
+                2. 🔍 **Diagnóstico Clínico y Biomecánica Ocular**: Interpretación profunda del estado corneal, refractivo, acomodativo, binocular o neurológico según corresponda. Explicación de por qué se origina el problema.
                 3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje**:
-                   - Opción Primaria / Ideal (Parámetros exactos sugeridos, diseños, materiales).
-                   - Opción Alternativa o de Respaldo.
-                4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautas clave para la evaluación a corto y mediano plazo.
+                   - **Opción Primaria / Ideal**: Diseño exacto sugerido, parámetros geométricos, materiales, prescripción o pautas de intervención detalladas.
+                   - **Opción Alternativa**: Plan de respaldo o variante clínica ante posibles intolerancias o variaciones.
+                4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de las revisiones a corto y mediano plazo, signos de alerta y pronóstico visual esperado.
                 """
 
-                contents_payload = [prompt_sistema]
+                parts = [{"text": prompt_sistema}]
                 if imagenes_subidas:
                     for img_file in imagenes_subidas:
-                        img = Image.open(img_file)
-                        img.thumbnail((800, 800))
-                        contents_payload.append(img)
+                        img_bytes = img_file.read()
+                        encoded = base64.b64encode(img_bytes).decode('utf-8')
+                        parts.append({
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": encoded
+                            }
+                        })
 
-                client = genai.Client(api_key=api_key)
-                respuesta_modelo = None
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+                payload = {"contents": [{"parts": parts}]}
                 
+                respuesta_modelo = None
                 for intento in range(3):
                     try:
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=contents_payload,
+                        req = urllib.request.Request(
+                            url,
+                            data=json.dumps(payload).encode('utf-8'),
+                            headers={'Content-Type': 'application/json'}
                         )
-                        respuesta_modelo = response.text
-                        break
+                        with urllib.request.urlopen(req) as response:
+                            res_data = json.loads(response.read().decode('utf-8'))
+                            respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
+                            break
                     except Exception as e:
                         if intento == 2:
-                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la IA. Detalle: {e}"
+                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e}"
                         else:
                             time.sleep(2)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
-                st.success("✅ ¡Análisis Clínico Generado con Éxito!")
+                st.success("✅ ¡Análisis Clínico Profundo Generado con Éxito!")
                 
                 resultado_markdown = f"""
 ### 📋 Reporte Clínico Oficial - Óptica Zerzer
-* **Área Evaluada:** {categoria}
+* **Área / Solapa Evaluada:** {categoria}
 * **Validación de Sesión:** Activa (Colega Autorizado)
 
 ---
@@ -223,7 +238,7 @@ if validar_acceso():
                 st.download_button(
                     label="📥 Descargar Reporte Clínico (Formato Texto / PDF)",
                     data=buffer,
-                    file_name=f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_')}.txt",
+                    file_name=f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.txt",
                     mime="text/plain"
                 )
             else:
