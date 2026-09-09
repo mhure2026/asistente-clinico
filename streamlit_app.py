@@ -83,7 +83,7 @@ def validar_acceso():
     return True
 
 if validar_acceso():
-    # Inicializar el historial de chat en la sesión
+    # Inicializar variables de sesión
     if "mensajes" not in st.session_state:
         st.session_state.mensajes = []
     if "categoria_anterior" not in st.session_state:
@@ -114,112 +114,168 @@ if validar_acceso():
             ]
         )
         
-        # Si cambia de categoría, limpiamos el chat anterior para enfocar al nuevo especialista
         if st.session_state.categoria_anterior != categoria:
             st.session_state.categoria_anterior = categoria
             st.session_state.mensajes = []
 
         st.markdown("---")
-        st.markdown("### 📎 Insumos del Caso")
-        
-        imagenes_subidas = st.file_uploader(
-            "Subir imágenes (ej. Topografía, mapas, córnea - Máx 2)", 
-            type=["png", "jpg", "jpeg"], 
-            accept_multiple_files=True
-        )
-        
-        if imagenes_subidas and len(imagenes_subidas) > 2:
-            st.warning("⚠️ Máximo 2 fotos permitidas.")
-            imagenes_subidas = imagenes_subidas[:2]
-        
-        if st.button("🗑️ Limpiar Conversación del Caso"):
+        if st.button("🗑️ Limpiar Conversación / Nuevo Caso"):
             st.session_state.mensajes = []
             st.rerun()
         
         st.markdown("---")
         st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-    # Panel Principal de Conversación Continua
-    st.title("🔬 Panel de Discusión de Casos Clínicos")
+    # Panel Principal
+    st.title("🔬 Panel de Resolución de Casos Clínicos")
     st.markdown(
-        f"**Especialidad Activa:** {categoria} — Realice sus consultas iniciales o continúe debatiendo "
-        "el diagnóstico, parámetros y opciones terapéuticas en tiempo real con el asistente experto."
+        f"**Especialidad Activa:** {categoria} — Cargue los datos iniciales y las imágenes del paciente abajo, "
+        "o continúe debatiendo en el chat de seguimiento."
     )
     st.markdown("---")
 
-    # Mostrar el historial completo de mensajes en pantalla
-    for mensaje in st.session_state.mensajes:
-        with st.chat_message(mensaje["role"]):
-            st.markdown(mensaje["content"])
+    # Si el chat está vacío, mostramos el formulario inicial de carga de caso (Fotos + Texto)
+    if len(st.session_state.mensajes) == 0:
+        st.markdown("### 📎 Carga inicial del caso clínico")
+        
+        col_c1, col_c2 = st.columns([1, 1])
+        with col_c1:
+            imagenes_subidas = st.file_uploader(
+                "Subir imágenes (ej. Topografía, mapas, córnea - Máx 2)", 
+                type=["png", "jpg", "jpeg"], 
+                accept_multiple_files=True,
+                key="imagenes_inicio"
+            )
+            if imagenes_subidas and len(imagenes_subidas) > 2:
+                st.warning("⚠️ Máximo 2 fotos permitidas.")
+                imagenes_subidas = imagenes_subidas[:2]
+        
+        caso_texto = st.text_area(
+            "Detalle del caso clínico y parámetros del paciente:",
+            placeholder="Ej: K1: 43.00 @ 90, K2: 46.50 @ 180, AV, síntomas, excentricidad...",
+            height=130,
+            key="texto_inicio"
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🚀 Generar Análisis Clínico Profundo"):
+            if not API_KEY_SECRETA.strip():
+                st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+            elif not imagenes_subidas and not caso_texto.strip():
+                st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico.")
+            else:
+                with st.spinner(f"🔍 [Análisis Académico en Curso] Cruzando parámetros para [{categoria}] (Aprox. 1-2 min)..."):
+                    
+                    prompt_sistema = f"""
+                    Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
+                    Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
 
-    # Entrada de texto inferior para chatear permanentemente (estilo chat moderno)
-    pregunta_usuario = st.chat_input("Escribí tu consulta, evolución del paciente o duda sobre el caso clínico...")
+                    Área Clínica Seleccionada: {categoria}
+                    Parámetros e Insumos Ingresados: {caso_texto}
 
-    if pregunta_usuario:
-        if not API_KEY_SECRETA.strip():
-            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
-        else:
-            # Guardar y mostrar el mensaje del usuario de inmediato
-            st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
-            with st.chat_message("user"):
-                st.markdown(pregunta_usuario)
+                    El informe debe redactarse con un tono formal, médico-optométrico y claro, conteniendo obligatoriamente:
+                    1. 📋 **Resumen y Evaluación del Caso Clínico**
+                    2. 🔍 **Diagnóstico Clínico y Biomecánica Ocular**
+                    3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje** (Primaria y Alternativa)
+                    4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**
+                    """
 
-            with st.spinner("🔍 [Analizando caso en gabinete] Cruzando fundamentos bibliográficos..."):
-                
-                # Construir el historial y contexto para enviar a Gemini
-                prompt_sistema = f"""
-                Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es responder y debatir con un colega profesional de manera exhaustiva, detallada, estructurada y de rigor clínico absoluto.
-                Mantén la coherencia con los mensajes previos de la conversación.
-                """
+                    contents = [{"parts": [{"text": prompt_sistema}]}]
+                    if imagenes_subidas:
+                        for img_file in imagenes_subidas:
+                            img_bytes = img_file.read()
+                            encoded = base64.b64encode(img_bytes).decode('utf-8')
+                            contents[0]["parts"].append({
+                                "inline_data": {
+                                    "mime_type": "image/jpeg",
+                                    "data": encoded
+                                }
+                            })
 
-                contents = [{"parts": [{"text": prompt_sistema}]}]
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
+                    payload = {"contents": contents}
+                    
+                    respuesta_modelo = None
+                    for intento in range(3):
+                        try:
+                            req = urllib.request.Request(
+                                url,
+                                data=json.dumps(payload).encode('utf-8'),
+                                headers={'Content-Type': 'application/json'}
+                            )
+                            with urllib.request.urlopen(req) as response:
+                                res_data = json.loads(response.read().decode('utf-8'))
+                                respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
+                                break
+                        except Exception as e:
+                            if intento == 2:
+                                respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API. Detalle: {e}"
+                            else:
+                                time.sleep(2)
 
-                # Si es el primer mensaje y subió imágenes, las añadimos
-                if len(st.session_state.mensajes) == 1 and imagenes_subidas:
-                    for img_file in imagenes_subidas:
-                        img_bytes = img_file.read()
-                        encoded = base64.b64encode(img_bytes).decode('utf-8')
-                        contents[0]["parts"].append({
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": encoded
-                            }
+                if respuesta_modelo and not "⚠️" in respuesta_modelo:
+                    # Guardamos el prompt inicial y la respuesta en el historial
+                    st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico ingresado:\n{caso_texto}"})
+                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
+                    st.rerun()
+                else:
+                    st.error(respuesta_modelo)
+
+    # Si ya hay historial de chat, mostramos la conversación y la barra para seguir escribiendo abajo
+    else:
+        for mensaje in st.session_state.mensajes:
+            with st.chat_message(mensaje["role"]):
+                st.markdown(mensaje["content"])
+
+        pregunta_usuario = st.chat_input("Escribí tu consulta de seguimiento, evolución o duda sobre este paciente...")
+
+        if pregunta_usuario:
+            if not API_KEY_SECRETA.strip():
+                st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+            else:
+                st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
+                with st.chat_message("user"):
+                    st.markdown(pregunta_usuario)
+
+                with st.spinner("🔍 [Analizando seguimiento en gabinete]..."):
+                    prompt_sistema = f"""
+                    Actúa como un profesor universitario de optometría y especialista experto en {categoria}.
+                    Responde al colega manteniendo la coherencia total con el caso clínico analizado previamente en la conversación.
+                    """
+
+                    contents = [{"parts": [{"text": prompt_sistema}]}]
+                    for msg in st.session_state.mensajes:
+                        rol_gemini = "user" if msg["role"] == "user" else "model"
+                        contents.append({
+                            "role": rol_gemini,
+                            "parts": [{"text": msg["content"]}]
                         })
 
-                # Agregar todo el historial de la charla para mantener memoria
-                for msg in st.session_state.mensajes:
-                    rol_gemini = "user" if msg["role"] == "user" else "model"
-                    contents.append({
-                        "role": rol_gemini,
-                        "parts": [{"text": msg["content"]}]
-                    })
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
+                    payload = {"contents": contents}
+                    
+                    respuesta_modelo = None
+                    for intento in range(3):
+                        try:
+                            req = urllib.request.Request(
+                                url,
+                                data=json.dumps(payload).encode('utf-8'),
+                                headers={'Content-Type': 'application/json'}
+                            )
+                            with urllib.request.urlopen(req) as response:
+                                res_data = json.loads(response.read().decode('utf-8'))
+                                respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
+                                break
+                        except Exception as e:
+                            if intento == 2:
+                                respuesta_modelo = f"⚠️ Error temporal: {e}"
+                            else:
+                                time.sleep(2)
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
-                payload = {"contents": contents}
-                
-                respuesta_modelo = None
-                for intento in range(3):
-                    try:
-                        req = urllib.request.Request(
-                            url,
-                            data=json.dumps(payload).encode('utf-8'),
-                            headers={'Content-Type': 'application/json'}
-                        )
-                        with urllib.request.urlopen(req) as response:
-                            res_data = json.loads(response.read().decode('utf-8'))
-                            respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
-                            break
-                    except Exception as e:
-                        if intento == 2:
-                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e}"
-                        else:
-                            time.sleep(2)
-
-            if respuesta_modelo and not "⚠️" in respuesta_modelo:
-                st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
-                with st.chat_message("assistant"):
-                    st.markdown(respuesta_modelo)
-                st.rerun()
-            else:
-                st.error(respuesta_modelo)
+                if respuesta_modelo and not "⚠️" in respuesta_modelo:
+                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
+                    with st.chat_message("assistant"):
+                        st.markdown(respuesta_modelo)
+                    st.rerun()
+                else:
+                    st.error(respuesta_modelo)
