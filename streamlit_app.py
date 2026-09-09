@@ -1,241 +1,303 @@
-
-               import os
+import os
 import time
 import streamlit as st
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
 from google import genai
 from PIL import Image
-from fpdf import FPDF
 from io import BytesIO
 
+# Configuración de página ampliada
 st.set_page_config(
-    page_title="Asistente Clínico de Optometría Avanzada",
-    page_icon="👁️‍🗨️",
+    page_title="Asistente Clínico | Óptica Zerzer",
+    page_icon="👁️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ==========================================
-# 🔒 BLINDAJE Y PROTECCIÓN INTELECTUAL (CSS)
-# ==========================================
+# -------------------------------------------------------------
+# PROTECCIÓN DE PROPIEDAD INTELECTUAL Y ESTILOS PROFESIONALES
+# -------------------------------------------------------------
 st.markdown("""
     <style>
+    /* Ocultar elementos de Streamlit para evitar que copien o inspeccionen la app */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    .main {
+        background-color: #f8f9fa;
+    }
     .stButton>button {
         width: 100%;
         background-color: #0d6efd;
         color: white;
         font-weight: bold;
         border-radius: 6px;
+        padding: 0.5rem;
     }
     .stButton>button:hover {
         background-color: #0b5ed7;
         color: white;
     }
+    .info-box {
+        background-color: #e9ecef;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 5px solid #0d6efd;
+        font-size: 14px;
+        color: #333333;
+    }
+    .security-notice {
+        font-size: 11px;
+        color: #6c757d;
+        text-align: center;
+        margin-top: 20px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 🔒 SISTEMA DE ACCESO PRIVADO (CONTRASEÑA)
-# ==========================================
-CONTRASENIA_VALIDA = "zerzer2026"
+# Contraseña de acceso mensual
+CLAVE_ACCESO = "optica2026"
 
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-
-if not st.session_state.autenticado:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("## 🔐 Óptica Zerzer - Acceso Colegas")
-        st.info("Sistema exclusivo para profesionales suscriptores. Ingrese su contraseña mensual.")
-        
-        input_pass = st.text_input("Contraseña de acceso:", type="password")
-        if st.button("Ingresar al Sistema"):
-            if input_pass == CONTRASENIA_VALIDA:
-                st.session_state.autenticado = True
-                st.rerun()
-            else:
-                st.error("❌ Contraseña incorrecta. Verifique sus datos.")
-    st.stop()
-
-# ==========================================
-# 🛠️ PANEL LATERAL Y NAVEGACIÓN
-# ==========================================
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=60)
-    st.title("Óptica Zerzer")
-    st.markdown("*Asistente Clínico Profesional*")
-    
-    if st.button("🚪 Cerrar Sesión"):
+def validar_acceso():
+    if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
-        st.rerun()
+
+    if not st.session_state.autenticado:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.markdown("### 👁️ Óptica Zerzer - Asistente Clínico Optométrico")
+            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor.")
+            
+            password = st.text_input("Ingresá tu contraseña de acceso mensual:", type="password")
+            
+            if st.button("Validar Ingreso"):
+                if password == CLAVE_ACCESO:
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("Contraseña incorrecta o membresía vencida.")
+        return False
+    return True
+
+# Ejecutar control de seguridad antes de mostrar nada
+if validar_acceso():
+
+    # -------------------------------------------------------------
+    # BARRA LATERAL (IZQUIERDA) - NAVEGACIÓN Y CARGA DE INSUMOS
+    # -------------------------------------------------------------
+    with st.sidebar:
+        st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
+        st.title("Óptica Zerzer")
+        st.markdown("*Asistente Clínico Optométrico*")
+        st.markdown("---")
         
-    api_key_input = st.text_input("🔑 Gemini API Key", type="password")
-    
-    st.markdown("---")
-    modo_consulta = st.selectbox(
-        "🧠 Área Clínica / Colección:",
-        [
-            "🔬 Adaptación de Rígidas y Topografía",
-            "🎯 Terapia Visual",
-            "👁️ Baja Visión",
-            "👶 Pediatria",
-            "🧠 Neurología",
-            "📚 General y Clínica"
-        ]
-    )
-    
-    uploaded_images = st.file_uploader(
-        "📷 Subir imágenes clínicas (Máx. 2)", 
-        type=["png", "jpg", "jpeg"], 
-        accept_multiple_files=True,
-        help="Subí hasta 2 imágenes clave de topografía o córnea."
-    )
-    
-    if uploaded_images and len(uploaded_images) > 2:
-        st.warning("⚠️ Máximo 2 fotos permitidas.")
-        uploaded_images = uploaded_images[:2]
-    
-    paciente_info = st.text_area(
-        "📝 Datos cuantitativos / Caso clínico:",
-        placeholder="Ej: K1: 44.00 @ 90, K2: 47.50 @ 180...",
-        height=140
-    )
-    st.markdown("---")
-    st.caption("© Óptica Zerzer - Propiedad Protegida")
+        # Opción para cerrar sesión si se requiere
+        if st.button("🚪 Cerrar Sesión"):
+            st.session_state.autenticado = False
+            st.rerun()
 
-# ==========================================
-# CUERPO PRINCIPAL
-# ==========================================
-st.title("👁️‍🗨️ Panel de Resolución de Casos Clínicos")
+        api_key_input = st.text_input("🔑 Gemini API Key", type="password", help="Ingresá tu clave de API para procesar con IA.")
+        
+        st.markdown("---")
+        st.markdown("### 📂 Seleccioná la Categoría")
+        categoria = st.selectbox(
+            "Área clínica a consultar:",
+            [
+                "Topografía compleja / Queratocono",
+                "Adaptación de Lentes Rígidas (RGP)",
+                "Baja Visión",
+                "General y Clínica",
+                "Neurología",
+                "Pediatría",
+                "Terapia Visual"
+            ]
+        )
+        
+        st.markdown("---")
+        st.markdown("### 📎 Insumos del Caso")
+        
+        # Subida de imágenes (topografía, córnea, etc. - Máximo 2)
+        imagenes_subidas = st.file_uploader(
+            "Subir imágenes (ej. Topografía corneal - Máx 2)", 
+            type=["png", "jpg", "jpeg"], 
+            accept_multiple_files=True
+        )
+        
+        if imagenes_subidas and len(imagenes_subidas) > 2:
+            st.warning("⚠️ Máximo 2 fotos permitidas.")
+            imagenes_subidas = imagenes_subidas[:2]
+        
+        # Subida de texto clínico
+        caso_texto = st.text_area(
+            "Detalle del caso clínico y parámetros:",
+            placeholder="Ej: K1 43.00 @ 90, K2 46.50 @ 180. Agudeza visual, síntomas...",
+            height=120
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        boton_analizar = st.button("🚀 Generar Análisis Clínico Profundo")
+        
+        st.markdown("---")
+        st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-st.info(
-    "💡 **Nota sobre el análisis de imágenes clínicas:**\n\n"
-    "Para garantizar un diagnóstico de alta precisión basado exclusivamente en la bibliografía de la solapa activa, "
-    "el sistema demanda entre **2 a 3 minutos** de procesamiento profundo. ¡Agradecemos su paciencia!",
-    icon="⏱️"
-)
+    # -------------------------------------------------------------
+    # CUERPO PRINCIPAL DE LA PANTALLA (DERECHA / CENTRO)
+    # -------------------------------------------------------------
+    col_main_1, col_main_2 = st.columns([2, 1])
 
-api_key = api_key_input if api_key_input else os.environ.get("GEMINI_API_KEY")
+    with col_main_1:
+        st.title("🔬 Panel de Resolución de Casos Clínicos")
+        st.markdown(
+            "Bienvenido colega. Este espacio inteligente procesa sus parámetros e imágenes clínicas aplicando "
+            "estrictamente los protocolos y normativas bibliográficas de la solapa seleccionada para garantizarle "
+            "un rigor científico de máxima categoría en su gabinete."
+        )
 
-if not api_key:
-    st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral para comenzar.")
-    st.stop()
-
-# Inicialización correcta del cliente de Gemini
-client = genai.Client(api_key=api_key)
-
-@st.cache_resource
-def obtener_motor_chroma():
-    chroma_client = chromadb.PersistentClient(path="./base_datos_optometria")
-    emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-    return chroma_client, emb_fn
-
-chroma_client, emb_fn = obtener_motor_chroma()
-
-mapeo_colecciones = {
-    "🔬 Adaptación de Rígidas y Topografía": "colleccion_rigidas",
-    "🎯 Terapia Visual": "colleccion_terapia",
-    "👁️ Baja Visión": "colleccion_baja_vision",
-    "👶 Pediatria": "colleccion_pediatria",
-    "🧠 Neurología": "colleccion_neurologia",
-    "📚 General y Clínica": "colleccion_general"
-}
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-prompt = st.chat_input("Escribí tu consulta sobre el caso o las imágenes...")
-
-if prompt or uploaded_images:
-    user_input_display = prompt if prompt else "Analizar las imágenes clínicas adjuntas junto con el caso."
-    st.session_state.messages.append({"role": "user", "content": user_input_display})
-    
-    with st.chat_message("user"):
-        st.markdown(user_input_display)
-        if uploaded_images:
-            cols = st.columns(len(uploaded_images))
-            for idx, img_file in enumerate(uploaded_images):
-                with cols[idx]:
-                    st.image(Image.open(img_file), caption=f"Foto {idx+1}", width=200)
-
-    with st.chat_message("assistant"):
-        with st.spinner("🔍 Analizando mapas topográficos y contrastando con literatura científica (2-3 minutos)..."):
-            
-            nombre_col_actual = mapeo_colecciones.get(modo_consulta, "colleccion_general")
-            coleccion_activa = chroma_client.get_or_create_collection(name=nombre_col_actual, embedding_function=emb_fn)
-            
-            query_texto = f"{prompt if prompt else ''} {paciente_info}"
-            resultados = coleccion_activa.query(query_texts=[query_texto], n_results=1)
-            documentos = resultados.get("documents", [[]])[0]
-            contexto = "\n\n".join(documentos) if documentos else "Sin contexto específico en libros."
-            
-            prompt_sistema = f"""
-            Actúa como un profesor universitario de optometría y optómetra clínico especialista.
-            Sé riguroso, profundo y estructurado. Analiza detalladamente las imágenes subidas (topografías/fotos), los datos aportados y la bibliografía de referencia para redactar una guía clínica exhaustiva.
-
-            Área: {modo_consulta}
-            Datos: {paciente_info}
-            Bibliografía: {contexto}
-            Consulta: {prompt if prompt else "Análisis integral de las imágenes clínicas aportadas."}
+    with col_main_2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
             """
-            
-            contents_payload = [prompt_sistema]
-            if uploaded_images:
-                for img_file in uploaded_images:
-                    img = Image.open(img_file)
-                    img.thumbnail((500, 500)) 
-                    contents_payload.append(img)
+            <div class="info-box">
+            <b>⏱️ Nota sobre tiempos de procesamiento:</b><br>
+            Para resguardar la máxima precisión analítica y realizar el cruce bibliográfico exclusivo de la solapa activa, 
+            el sistema demanda <b>entre 2 y 3 minutos</b> de pensamiento profundo. Agradecemos su espera para ofrecerle un reporte impecable.
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 
-            respuesta_modelo = None
-            for intento in range(3):
-                try:
-                    # Corrección clave para la SDK moderna de google-genai
-                    response = client.models.generate_content(
-                        model='gemini-3.6-flash',
-                        contents=contents_payload,
-                    )
-                    respuesta_modelo = response.text
-                    break
-                except Exception as e:
-                    if intento == 2:
-                        respuesta_modelo = f"⚠️ Alta demanda temporal. Por favor, reintentá. Detalle: {e}"
-                    else:
-                        time.sleep(1)
+    st.markdown("---")
 
-            st.markdown(respuesta_modelo)
-            st.session_state.messages.append({"role": "assistant", "content": respuesta_modelo})
+    # Configuración de API Key
+    api_key = api_key_input if api_key_input else os.environ.get("GEMINI_API_KEY")
 
-            # --- GENERACIÓN DE PDF Y DESCARGA ---
+    # Inicialización de motor ChromaDB local (con manejo seguro si no existe la carpeta aún)
+    @st.cache_resource
+    def obtener_motor_chroma():
+        try:
+            chroma_client = chromadb.PersistentClient(path="./base_datos_optometria")
+            emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+            return chroma_client, emb_fn
+        except Exception:
+            return None, None
+
+    chroma_client, emb_fn = obtener_motor_chroma()
+
+    # Mapeo exacto de colecciones según la solapa elegida (aisladas para que la app sea rápida)
+    mapeo_colecciones = {
+        "Topografía compleja / Queratocono": "colleccion_topografia",
+        "Adaptación de Lentes Rígidas (RGP)": "colleccion_rigidas",
+        "Baja Visión": "colleccion_baja_vision",
+        "General y Clínica": "colleccion_general",
+        "Neurología": "colleccion_neurologia",
+        "Pediatría": "colleccion_pediatria",
+        "Terapia Visual": "colleccion_terapia"
+    }
+
+    # -------------------------------------------------------------
+    # LÓGICA DE PROCESAMIENTO CON INTELIGENCIA ARTIFICIAL PROFUNDA
+    # -------------------------------------------------------------
+    if boton_analizar:
+        if not api_key:
+            st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral para permitir que la app procese el caso.")
+        elif not imagenes_subidas and not caso_texto.strip():
+            st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico en texto.")
+        else:
+            with st.spinner(f"🔍 [Proceso Profundo] Analizando base bibliográfica específica para [{categoria}], cruzando topografías y evaluando parámetros (Aprox. 2-3 min)..."):
+                
+                # 1. Búsqueda en la colección vectorial correspondiente (Aislamiento por solapa)
+                contexto = "Sin contexto específico adicional en la base local."
+                if chroma_client and emb_fn:
+                    try:
+                        nombre_col = mapeo_colecciones.get(categoria, "colleccion_general")
+                        coleccion_activa = chroma_client.get_or_create_collection(name=nombre_col, embedding_function=emb_fn)
+                        resultados = coleccion_activa.query(query_texts=[caso_texto if caso_texto else "Análisis general de imágenes"], n_results=1)
+                        documentos = resultados.get("documents", [[]])[0]
+                        if documentos:
+                            contexto = "\n\n".join(documentos)
+                    except Exception:
+                        contexto = "Base de datos local en inicialización estándar."
+
+                # 2. Construcción del Prompt Experto y Riguroso
+                prompt_sistema = f"""
+                Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+
+                Área Clínica Seleccionada: {categoria}
+                Parámetros y Datos Ingresados por el Colega: {caso_texto}
+                Literatura Científica de Referencia (Exclusiva de esta solapa): {contexto}
+
+                Estructura obligatoria y detallada que debe contener tu respuesta:
+                1. 📋 **Resumen y Evaluación del Caso Clínico**: Análisis pormenorizado de los datos cuantitativos y cualitativos aportados.
+                2. 🔍 **Diagnóstico Diferencial y Biomecánica Ocular**: Interpretación profunda del problema visual, estado corneal, excentricidades o anomalías detectadas según las imágenes y valores.
+                3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje**:
+                   - Opción Primaria / Ideal (Parámetros exactos sugeridos, diseños, materiales o pautas de trabajo).
+                   - Opción Alternativa o de Respaldo.
+                4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautas clave para la evaluación del paciente a corto y mediano plazo.
+
+                Sé sumamente claro, técnico, profesional y profundo. Evita respuestas superficiales.
+                """
+
+                # 3. Preparación de contenidos (Texto + Imágenes adjuntas)
+                contents_payload = [prompt_sistema]
+                if imagenes_subidas:
+                    for img_file in imagenes_subidas:
+                        img = Image.open(img_file)
+                        img.thumbnail((800, 800)) # Optimización de tamaño para el motor
+                        contents_payload.append(img)
+
+                # 4. Invocación al modelo con reintentos para garantizar estabilidad
+                client = genai.Client(api_key=api_key)
+                respuesta_modelo = None
+                
+                for intento in range(3):
+                    try:
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash', # o el modelo activo configurado
+                            contents=contents_payload,
+                        )
+                        respuesta_modelo = response.text
+                        break
+                    except Exception as e:
+                        if intento == 2:
+                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal al procesar la alta demanda con el motor de IA. Por favor, reintentá en unos segundos. Detalle técnico: {e}"
+                        else:
+                            time.sleep(2)
+
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
-                class PDF(FPDF):
-                    def header(self):
-                        self.set_font("Arial", "B", 12)
-                        self.cell(0, 10, "Informe Clínico - Óptica Zerzer", 0, 1, "C")
-                        self.ln(5)
-
-                pdf = PDF()
-                pdf.add_page()
-                pdf.set_font("Arial", size=10)
+                st.success("✅ ¡Análisis Clínico Generado con Éxito!")
                 
-                texto_limpio = respuesta_modelo.encode('latin-1', 'replace').decode('latin-1')
-                pdf.multi_cell(0, 6, texto_limpio)
-                
-                pdf_output_path = "informe_clinico_optometria.pdf"
-                pdf.output(pdf_output_path)
+                # Enmarcar el reporte oficial
+                resultado_markdown = f"""
+### 📋 Reporte Clínico Oficial - Óptica Zerzer
+* **Área Evaluada:** {categoria}
+* **Validación de Sesión:** Activa (Colega Autorizado)
 
-                with open(pdf_output_path, "rb") as pdf_file:
-                    st.download_button(
-                        label="📥 Descargar Informe en PDF para Imprimir",
-                        data=pdf_file,
-                        file_name="informe_optometrico_zerzer.pdf",
-                        mime="application/pdf"
-                    )
+---
+{respuesta_modelo}
+---
+*Aviso legal: Este reporte es una herramienta de asistencia profesional generada por el Asistente Clínico de Óptica Zerzer. Queda prohibida la reproducción total o parcial de la metodología, bases de datos y estructura de esta plataforma.*
+                """
+                
+                st.markdown(resultado_markdown)
+                
+                # -------------------------------------------------------------
+                # BOTÓN DE DESCARGA DE REPORTE
+                # -------------------------------------------------------------
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                buffer = BytesIO()
+                buffer.write(resultado_markdown.encode('utf-8'))
+                buffer.seek(0)
+                
+                st.download_button(
+                    label="📥 Descargar Reporte Clínico (Formato PDF / Texto)",
+                    data=buffer,
+                    file_name=f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_')}.txt",
+                    mime="text/plain"
+                )
+            else:
+                st.error(respuesta_modelo)
