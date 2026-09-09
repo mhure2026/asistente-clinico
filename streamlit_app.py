@@ -3,6 +3,7 @@ import time
 import json
 import base64
 import urllib.request
+import re
 import streamlit as st
 from PIL import Image
 
@@ -246,9 +247,29 @@ if validar_acceso():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-        # Generador de HTML para descarga de PDF al pie del reporte
+        # Generador de HTML limpio para descarga de PDF al pie del reporte
         ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
         
+        # Limpieza de código Markdown y LaTeX para impresión perfecta en HTML
+        texto_limpio_html = ultimo_reporte
+        texto_limpio_html = re.sub(r'#{1,6}\s*', '', texto_limpio_html)
+        texto_limpio_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', texto_limpio_html)
+        texto_limpio_html = re.sub(r'\*(.*?)\*', r'<em>\1</em>', texto_limpio_html)
+        texto_limpio_html = texto_limpio_html.replace(r'\text{D}', 'D')
+        texto_limpio_html = texto_limpio_html.replace(r'\mu', 'µ')
+        texto_limpio_html = texto_limpio_html.replace(r'^\circ', '°')
+        texto_limpio_html = texto_limpio_html.replace(r'^{\circ}', '°')
+        texto_limpio_html = texto_limpio_html.replace('$', '')
+        
+        lineas_html = []
+        for l in texto_limpio_html.split('\n'):
+            l_trim = l.strip()
+            if l_trim.startswith('* ') or l_trim.startswith('- '):
+                lineas_html.append('&bull; ' + l_trim[2:])
+            else:
+                lineas_html.append(l)
+        texto_final_html = '<br>'.join(lineas_html)
+
         html_contenido = f"""
         <!DOCTYPE html>
         <html lang="es">
@@ -269,7 +290,7 @@ if validar_acceso():
                 <p><strong>Especialidad:</strong> {categoria}</p>
             </div>
             <div>
-                {ultimo_reporte.replace(chr(10), '<br>')}
+                {texto_final_html}
             </div>
             <div class="footer">
                 Aviso legal: Este reporte es una herramienta de asistencia profesional generada por el Asistente Clínico de Óptica Zerzer. Uso exclusivo profesional.
@@ -334,11 +355,11 @@ if validar_acceso():
                                 res_data = json.loads(response.read().decode('utf-8'))
                                 respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
                                 break
-                        except Exception as e:
-                            if intento == 2:
-                                respuesta_modelo = f"⚠️ Error temporal: {e}"
-                            else:
-                                time.sleep(2)
+                    except Exception as e:
+                        if intento == 2:
+                            respuesta_modelo = f"⚠️ Error temporal: {e}"
+                        else:
+                            time.sleep(2)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
