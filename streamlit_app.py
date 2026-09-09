@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 # Contraseña de acceso mensual (puedes cambiarla cuando gustes)
-CLAVE_ACCESO = "optica2026"
+CLAVE_ACCESO = "OPTICA2026"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
