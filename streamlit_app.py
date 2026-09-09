@@ -14,7 +14,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estética y blindaje profesional
+CLAVE_ACCESO = "optica2026"
+
+# Aquí el sistema busca la clave de forma invisible en el cofre seguro
+try:
+    API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "")
+
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -50,8 +57,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-CLAVE_ACCESO = "optica2026"
-
 def validar_acceso():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
@@ -85,12 +90,8 @@ if validar_acceso():
             st.session_state.autenticado = False
             st.rerun()
 
-        api_key_input = st.text_input("🔑 Gemini API Key", type="password", help="Ingresá tu clave de API de Google Gemini.")
-        
-        st.markdown("---")
         st.markdown("### 📂 Seleccioná la Categoría / Solapa")
         
-        # Las 6 áreas clínicas especializadas
         categoria = st.selectbox(
             "Área especializada a consultar:",
             [
@@ -153,11 +154,9 @@ if validar_acceso():
 
     st.markdown("---")
 
-    api_key = api_key_input if api_key_input else os.environ.get("GEMINI_API_KEY")
-
     if boton_analizar:
-        if not api_key:
-            st.warning("⚠️ Por favor, ingresá tu Gemini API Key en la barra lateral para activar el motor clínico.")
+        if not API_KEY_SECRETA.strip():
+            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit. Configurá los secretos en tu panel de Streamlit Cloud.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico en texto.")
         else:
@@ -192,7 +191,7 @@ if validar_acceso():
                             }
                         })
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
                 payload = {"contents": [{"parts": parts}]}
                 
                 respuesta_modelo = None
