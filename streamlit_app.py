@@ -163,7 +163,6 @@ if validar_acceso():
         else:
             with st.spinner(f"🔍 [Análisis Académico en Curso] Cruzando parámetros bibliográficos para [{categoria}] (Aprox. 1-2 min)..."):
                 
-                # Definición de directrices expertas según la solapa activa
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
                 Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
@@ -193,7 +192,7 @@ if validar_acceso():
                             }
                         })
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
                 payload = {"contents": [{"parts": parts}]}
                 
                 respuesta_modelo = None
