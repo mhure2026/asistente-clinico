@@ -5,7 +5,6 @@ import base64
 import urllib.request
 import streamlit as st
 from PIL import Image
-from io import BytesIO
 
 st.set_page_config(
     page_title="Asistente Clínico | Óptica Zerzer",
@@ -19,7 +18,6 @@ st.set_page_config(
 # ----------------------------------------------------
 CLAVE_ACCESO = "optica2026"
 
-# Obtención segura de la API Key desde el cofre privado de Streamlit Cloud (o entorno local)
 try:
     API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
 except Exception:
@@ -85,6 +83,12 @@ def validar_acceso():
     return True
 
 if validar_acceso():
+    # Inicializar el historial de chat en la sesión
+    if "mensajes" not in st.session_state:
+        st.session_state.mensajes = []
+    if "categoria_anterior" not in st.session_state:
+        st.session_state.categoria_anterior = ""
+
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
@@ -93,11 +97,11 @@ if validar_acceso():
         
         if st.button("🚪 Cerrar Sesión"):
             st.session_state.autenticado = False
+            st.session_state.mensajes = []
             st.rerun()
 
         st.markdown("### 📂 Seleccioná la Categoría / Solapa")
         
-        # Las 6 áreas clínicas especializadas
         categoria = st.selectbox(
             "Área especializada a consultar:",
             [
@@ -110,6 +114,11 @@ if validar_acceso():
             ]
         )
         
+        # Si cambia de categoría, limpiamos el chat anterior para enfocar al nuevo especialista
+        if st.session_state.categoria_anterior != categoria:
+            st.session_state.categoria_anterior = categoria
+            st.session_state.mensajes = []
+
         st.markdown("---")
         st.markdown("### 📎 Insumos del Caso")
         
@@ -123,82 +132,71 @@ if validar_acceso():
             st.warning("⚠️ Máximo 2 fotos permitidas.")
             imagenes_subidas = imagenes_subidas[:2]
         
-        caso_texto = st.text_area(
-            "Detalle del caso clínico y parámetros:",
-            placeholder="Ej: K1: 43.00 @ 90, K2: 46.50 @ 180, AV, síntomas, excentricidad...",
-            height=130
-        )
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        boton_analizar = st.button("🚀 Generar Análisis Clínico Profundo")
+        if st.button("🗑️ Limpiar Conversación del Caso"):
+            st.session_state.mensajes = []
+            st.rerun()
         
         st.markdown("---")
         st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-    col_main_1, col_main_2 = st.columns([2, 1])
-
-    with col_main_1:
-        st.title("🔬 Panel de Resolución de Casos Clínicos")
-        st.markdown(
-            "Bienvenido colega. Este asistente inteligente procesa los parámetros y las imágenes clínicas aplicando "
-            "rigurosos protocolos universitarios y bibliografía avanzada de la solapa seleccionada para ofrecerle "
-            "un diagnóstico clínico profundo, preciso y con opciones terapéuticas claras para su gabinete."
-        )
-
-    with col_main_2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div class="info-box">
-            <b>⏱️ Nota sobre el análisis profundo:</b><br>
-            Para garantizar un reporte exhaustivo, fundamentado y de máxima calidad académica, 
-            el sistema procesa el caso en profundidad durante <b>1 a 2 minutos</b>. Agradecemos su espera.
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-
+    # Panel Principal de Conversación Continua
+    st.title("🔬 Panel de Discusión de Casos Clínicos")
+    st.markdown(
+        f"**Especialidad Activa:** {categoria} — Realice sus consultas iniciales o continúe debatiendo "
+        "el diagnóstico, parámetros y opciones terapéuticas en tiempo real con el asistente experto."
+    )
     st.markdown("---")
 
-    if boton_analizar:
+    # Mostrar el historial completo de mensajes en pantalla
+    for mensaje in st.session_state.mensajes:
+        with st.chat_message(mensaje["role"]):
+            st.markdown(mensaje["content"])
+
+    # Entrada de texto inferior para chatear permanentemente (estilo chat moderno)
+    pregunta_usuario = st.chat_input("Escribí tu consulta, evolución del paciente o duda sobre el caso clínico...")
+
+    if pregunta_usuario:
         if not API_KEY_SECRETA.strip():
-            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit. Configurá los secretos en tu panel de Streamlit Cloud.")
-        elif not imagenes_subidas and not caso_texto.strip():
-            st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico en texto.")
+            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
         else:
-            with st.spinner(f"🔍 [Análisis Académico en Curso] Cruzando parámetros bibliográficos para [{categoria}] (Aprox. 1-2 min)..."):
+            # Guardar y mostrar el mensaje del usuario de inmediato
+            st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
+            with st.chat_message("user"):
+                st.markdown(pregunta_usuario)
+
+            with st.spinner("🔍 [Analizando caso en gabinete] Cruzando fundamentos bibliográficos..."):
                 
+                # Construir el historial y contexto para enviar a Gemini
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
-
-                Área Clínica Seleccionada: {categoria}
-                Parámetros y Datos Cuantitativos/Cualitativos Ingresados: {caso_texto}
-
-                El informe debe redactarse con un tono formal, médico-optométrico y sumamente claro. Debe contener obligatoriamente la siguiente estructura profesional:
-
-                1. 📋 **Resumen y Evaluación del Caso Clínico**: Análisis pormenorizado de los datos aportados, correlacionándolos con la alteración visual o patológica de la solapa.
-                2. 🔍 **Diagnóstico Clínico y Biomecánica Ocular**: Interpretación profunda del estado corneal, refractivo, acomodativo, binocular o neurológico según corresponda. Explicación de por qué se origina el problema.
-                3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje**:
-                   - **Opción Primaria / Ideal**: Diseño exacto sugerido, parámetros geométricos, materiales, prescripción o pautas de intervención detalladas.
-                   - **Opción Alternativa**: Plan de respaldo o variante clínica ante posibles intolerancias o variaciones.
-                4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de las revisiones a corto y mediano plazo, signos de alerta y pronóstico visual esperado.
+                Tu tarea es responder y debatir con un colega profesional de manera exhaustiva, detallada, estructurada y de rigor clínico absoluto.
+                Mantén la coherencia con los mensajes previos de la conversación.
                 """
 
-                parts = [{"text": prompt_sistema}]
-                if imagenes_subidas:
+                contents = [{"parts": [{"text": prompt_sistema}]}]
+
+                # Si es el primer mensaje y subió imágenes, las añadimos
+                if len(st.session_state.mensajes) == 1 and imagenes_subidas:
                     for img_file in imagenes_subidas:
                         img_bytes = img_file.read()
                         encoded = base64.b64encode(img_bytes).decode('utf-8')
-                        parts.append({
+                        contents[0]["parts"].append({
                             "inline_data": {
                                 "mime_type": "image/jpeg",
                                 "data": encoded
                             }
                         })
 
+                # Agregar todo el historial de la charla para mantener memoria
+                for msg in st.session_state.mensajes:
+                    rol_gemini = "user" if msg["role"] == "user" else "model"
+                    contents.append({
+                        "role": rol_gemini,
+                        "parts": [{"text": msg["content"]}]
+                    })
+
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
-                payload = {"contents": [{"parts": parts}]}
+                payload = {"contents": contents}
                 
                 respuesta_modelo = None
                 for intento in range(3):
@@ -219,91 +217,9 @@ if validar_acceso():
                             time.sleep(2)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
-                st.success("✅ ¡Análisis Clínico Profundo Generado con Éxito!")
-                
-                resultado_markdown = f"""
-### 📋 Reporte Clínico Oficial - Óptica Zerzer
-* **Área / Solapa Evaluada:** {categoria}
-* **Validación de Sesión:** Activa (Colega Authorized)
-
----
-{respuesta_modelo}
----
-*Aviso legal: Este reporte es una herramienta de asistencia profesional generada por el Asistente Clínico de Óptica Zerzer. Queda prohibida la reproducción total o parcial de la metodología, bases de datos y estructura de esta plataforma.*
-                """
-                
-                st.markdown(resultado_markdown)
-                
-                # Generación de documento prolijo en formato HTML profesional (listo para guardar como PDF desde el navegador)
-                html_contenido = f"""
-                <!DOCTYPE html>
-                <html lang="es">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Reporte Clínico - Óptica Zerzer</title>
-                    <style>
-                        body {{
-                            font-family: Arial, sans-serif;
-                            max-width: 800px;
-                            margin: 40px auto;
-                            padding: 30px;
-                            background-color: #ffffff;
-                            color: #2b2b2b;
-                            line-height: 1.6;
-                            border: 1px solid #e0e0e0;
-                            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-                            border-radius: 8px;
-                        }}
-                        .header {{
-                            background-color: #0d6efd;
-                            color: white;
-                            padding: 20px;
-                            border-radius: 6px;
-                            margin-bottom: 25px;
-                        }}
-                        h1 {{ margin: 0; font-size: 22px; }}
-                        p {{ margin: 5px 0; font-size: 14px; }}
-                        .content {{ margin-top: 20px; font-size: 15px; }}
-                        h3 {{ color: #0d6efd; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; margin-top: 25px; }}
-                        .footer {{
-                            margin-top: 40px;
-                            font-size: 11px;
-                            color: #6c757d;
-                            text-align: center;
-                            border-top: 1px solid #dee2e6;
-                            padding-top: 15px;
-                        }}
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>📋 Reporte Clínico Oficial - Óptica Zerzer</h1>
-                        <p><strong>Área / Solapa Evaluada:</strong> {categoria}</p>
-                    </div>
-                    <div class="content">
-                        {respuesta_modelo.replace(chr(10), '<br>')}
-                    </div>
-                    <div class="footer">
-                        Aviso legal: Este reporte es una herramienta de asistencia profesional generada por el Asistente Clínico de Óptica Zerzer. Queda prohibida la reproducción total o parcial de la metodología y estructura de esta plataforma.
-                    </div>
-                </body>
-                </html>
-                """
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                
-                # Botón de descarga interactivo como documento prolijo
-                b64 = base64.b64encode(html_contenido.encode('utf-8')).decode('utf-8')
-                nombre_archivo = f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.html"
-                
-                href = f'''
-                <a href="data:text/html;base64,{b64}" download="{nombre_archivo}" style="text-decoration: none;">
-                    <div style="background-color: #0d6efd; color: white; padding: 0.7rem; text-align: center; font-weight: bold; border-radius: 6px; width: 100%;">
-                        📥 Descargar Reporte Clínico Profesional (Formato PDF / Impresión)
-                    </div>
-                </a>
-                '''
-                st.markdown(href, unsafe_allow_html=True)
-                st.info("💡 **Tip:** Al abrir el archivo descargado en tu computadora, presiono **Ctrl + P** (o Cmd + P en Mac) y elegí **'Guardar como PDF'** para obtener el documento impreso o digital perfecto.")
+                st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
+                with st.chat_message("assistant"):
+                    st.markdown(respuesta_modelo)
+                st.rerun()
             else:
                 st.error(respuesta_modelo)
