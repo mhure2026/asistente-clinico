@@ -69,7 +69,7 @@ def validar_acceso():
         with col2:
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.markdown("### 👁️ Óptica Zerzer - Asistente Clínico Optométrico")
-            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor.")
+            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor. Validación mensual requerida.")
             
             password = st.text_input("Ingresá tu contraseña de acceso mensual:", type="password")
             
@@ -83,16 +83,17 @@ def validar_acceso():
     return True
 
 if validar_acceso():
-    # Inicializar variables de sesión
+    # Inicialización de estados de sesión
     if "mensajes" not in st.session_state:
         st.session_state.mensajes = []
     if "categoria_anterior" not in st.session_state:
         st.session_state.categoria_anterior = ""
 
+    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
-        st.markdown("*Asistente Clínico Optométrico*")
+        st.markdown("*Asistente Clínico Optométrico Profesional*")
         st.markdown("---")
         
         if st.button("🚪 Cerrar Sesión"):
@@ -100,10 +101,10 @@ if validar_acceso():
             st.session_state.mensajes = []
             st.rerun()
 
-        st.markdown("### 📂 Seleccioná la Categoría / Solapa")
+        st.markdown("### 📂 Seleccioná la Especialidad")
         
         categoria = st.selectbox(
-            "Área especializada a consultar:",
+            "Área clínica a consultar:",
             [
                 "🔬 Adaptación de Rígidas y Topografía",
                 "🎯 Terapia Visual",
@@ -119,115 +120,182 @@ if validar_acceso():
             st.session_state.mensajes = []
 
         st.markdown("---")
+        st.markdown("### 📎 Fotografías del Caso")
+        imagenes_subidas = st.file_uploader(
+            "Subir hasta 2 imágenes (Topografía, córnea, mapas...):", 
+            type=["png", "jpg", "jpeg"], 
+            accept_multiple_files=True,
+            key="imgs_caso"
+        )
+        if imagenes_subidas and len(imagenes_subidas) > 2:
+            st.warning("⚠️ Máximo 2 fotos permitidas.")
+            imagenes_subidas = imagenes_subidas[:2]
+
+        st.markdown("### 📝 Datos Clínicos del Paciente")
+        caso_texto = st.text_area(
+            "Ingrese los parámetros y detalles del caso:",
+            placeholder="Ej: K1, K2, AV, síntomas, excentricidad, observaciones...",
+            height=120,
+            key="txt_caso"
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        boton_analizar = st.button("🚀 Generar Análisis Clínico Profundo")
+
+        st.markdown("---")
         if st.button("🗑️ Limpiar Conversación / Nuevo Caso"):
             st.session_state.mensajes = []
             st.rerun()
         
-        st.markdown("---")
         st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-    # Panel Principal
-    st.title("🔬 Panel de Resolución de Casos Clínicos")
-    st.markdown(
-        f"**Especialidad Activa:** {categoria} — Cargue los datos iniciales y las imágenes del paciente abajo, "
-        "o continúe debatiendo en el chat de seguimiento."
-    )
+    # PANEL PRINCIPAL: Presentación institucional, tiempos de análisis y reporte interactivo
+    col_p1, col_p2 = st.columns([2, 1])
+
+    with col_p1:
+        st.title("🔬 Panel de Resolución de Casos Clínicos")
+        st.markdown(
+            "Bienvenido colega a la plataforma avanzada de **Óptica Zerzer**. Este entorno exclusivo "
+            "cruza la bibliografía internacional y los modelos de IA más avanzados para brindarle un soporte "
+            "diagnóstico y terapéutico de máxima jerarquía en su gabinete."
+        )
+
+    with col_p2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="info-box">
+            <b>⏱️ Tiempo de procesamiento profundo:</b><br>
+            Para garantizar un reporte exhaustivo basado en bibliografía exhaustiva, el motor inteligente 
+            demora de <b>1 a 3 minutos</b> en procesar el caso en profundidad. Agradecemos su aguardo.
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
     st.markdown("---")
 
-    # Si el chat está vacío, mostramos el formulario inicial de carga de caso (Fotos + Texto)
-    if len(st.session_state.mensajes) == 0:
-        st.markdown("### 📎 Carga inicial del caso clínico")
-        
-        col_c1, col_c2 = st.columns([1, 1])
-        with col_c1:
-            imagenes_subidas = st.file_uploader(
-                "Subir imágenes (ej. Topografía, mapas, córnea - Máx 2)", 
-                type=["png", "jpg", "jpeg"], 
-                accept_multiple_files=True,
-                key="imagenes_inicio"
-            )
-            if imagenes_subidas and len(imagenes_subidas) > 2:
-                st.warning("⚠️ Máximo 2 fotos permitidas.")
-                imagenes_subidas = imagenes_subidas[:2]
-        
-        caso_texto = st.text_area(
-            "Detalle del caso clínico y parámetros del paciente:",
-            placeholder="Ej: K1: 43.00 @ 90, K2: 46.50 @ 180, AV, síntomas, excentricidad...",
-            height=130,
-            key="texto_inicio"
-        )
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚀 Generar Análisis Clínico Profundo"):
-            if not API_KEY_SECRETA.strip():
-                st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
-            elif not imagenes_subidas and not caso_texto.strip():
-                st.warning("⚠️ Por favor, subí al menos una imagen o completá los datos del caso clínico.")
+    # ACCIÓN DE GENERAR REPORTE INICIAL
+    if boton_analizar:
+        if not API_KEY_SECRETA.strip():
+            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+        elif not imagenes_subidas and not caso_texto.strip():
+            st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
+        else:
+            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
+                
+                prompt_sistema = f"""
+                Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+
+                Área Clínica Seleccionada: {categoria}
+                Datos Clínicos Ingresados por el Optómetra: {caso_texto}
+
+                El informe debe redactarse con un tono formal, médico-optométrico y sumamente claro. Debe contener obligatoriamente:
+                1. 📋 **Especificación y Descripción Detallada del Caso**: Análisis pormenorizado de los datos y parámetros aportados para que el optómetra entienda la base del cuadro.
+                2. 🔍 **Diagnóstico Clínico y Biomecánica Ocular**: Interpretación profunda del estado corneal, refractivo, acomodativo, binocular o neurológico según corresponda. Explicación de por qué se origina el problema.
+                3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje**: Varias opciones o alternativas basadas en bibliografía especializada (Opción Primaria y Alternativas).
+                4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de revisiones y pronóstico visual esperado.
+                """
+
+                contents = [{"parts": [{"text": prompt_sistema}]}]
+                if imagenes_subidas:
+                    for img_file in imagenes_subidas:
+                        img_bytes = img_file.read()
+                        encoded = base64.b64encode(img_bytes).decode('utf-8')
+                        contents[0]["parts"].append({
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": encoded
+                            }
+                        })
+
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
+                payload = {"contents": contents}
+                
+                respuesta_modelo = None
+                for intento in range(3):
+                    try:
+                        req = urllib.request.Request(
+                            url,
+                            data=json.dumps(payload).encode('utf-8'),
+                            headers={'Content-Type': 'application/json'}
+                        )
+                        with urllib.request.urlopen(req) as response:
+                            res_data = json.loads(response.read().decode('utf-8'))
+                            respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
+                            break
+                    except Exception as e:
+                        if intento == 2:
+                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e}"
+                        else:
+                            time.sleep(2)
+
+            if respuesta_modelo and not "⚠️" in respuesta_modelo:
+                st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
+                st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
+                st.rerun()
             else:
-                with st.spinner(f"🔍 [Análisis Académico en Curso] Cruzando parámetros para [{categoria}] (Aprox. 1-2 min)..."):
-                    
-                    prompt_sistema = f"""
-                    Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                    Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+                st.error(respuesta_modelo)
 
-                    Área Clínica Seleccionada: {categoria}
-                    Parámetros e Insumos Ingresados: {caso_texto}
-
-                    El informe debe redactarse con un tono formal, médico-optométrico y claro, conteniendo obligatoriamente:
-                    1. 📋 **Resumen y Evaluación del Caso Clínico**
-                    2. 🔍 **Diagnóstico Clínico y Biomecánica Ocular**
-                    3. 🛠️ **Opciones de Solución Terapéutica y Plan de Abordaje** (Primaria y Alternativa)
-                    4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**
-                    """
-
-                    contents = [{"parts": [{"text": prompt_sistema}]}]
-                    if imagenes_subidas:
-                        for img_file in imagenes_subidas:
-                            img_bytes = img_file.read()
-                            encoded = base64.b64encode(img_bytes).decode('utf-8')
-                            contents[0]["parts"].append({
-                                "inline_data": {
-                                    "mime_type": "image/jpeg",
-                                    "data": encoded
-                                }
-                            })
-
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
-                    payload = {"contents": contents}
-                    
-                    respuesta_modelo = None
-                    for intento in range(3):
-                        try:
-                            req = urllib.request.Request(
-                                url,
-                                data=json.dumps(payload).encode('utf-8'),
-                                headers={'Content-Type': 'application/json'}
-                            )
-                            with urllib.request.urlopen(req) as response:
-                                res_data = json.loads(response.read().decode('utf-8'))
-                                respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
-                                break
-                        except Exception as e:
-                            if intento == 2:
-                                respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API. Detalle: {e}"
-                            else:
-                                time.sleep(2)
-
-                if respuesta_modelo and not "⚠️" in respuesta_modelo:
-                    # Guardamos el prompt inicial y la respuesta en el historial
-                    st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico ingresado:\n{caso_texto}"})
-                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
-                    st.rerun()
-                else:
-                    st.error(respuesta_modelo)
-
-    # Si ya hay historial de chat, mostramos la conversación y la barra para seguir escribiendo abajo
-    else:
+    # VISUALIZACIÓN DE LA CONVERSACIÓN Y CHAT CONTINUO DE SEGUIMIENTO
+    if len(st.session_state.mensajes) > 0:
+        st.markdown("### 💬 Reporte Clínico y Conversación del Caso")
+        
         for mensaje in st.session_state.mensajes:
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-        pregunta_usuario = st.chat_input("Escribí tu consulta de seguimiento, evolución o duda sobre este paciente...")
+        # Generador de HTML para descarga de PDF al pie del reporte
+        ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
+        
+        html_contenido = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Reporte Clínico Oficial - Óptica Zerzer</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 30px; background: #fff; color: #2b2b2b; line-height: 1.6; border: 1px solid #e0e0e0; border-radius: 8px; }}
+                .header {{ background-color: #0d6efd; color: white; padding: 20px; border-radius: 6px; margin-bottom: 25px; }}
+                h1 {{ margin: 0; font-size: 22px; }}
+                h3 {{ color: #0d6efd; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; margin-top: 25px; }}
+                .footer {{ margin-top: 40px; font-size: 11px; color: #6c757d; text-align: center; border-top: 1px solid #dee2e6; padding-top: 15px; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>📋 Reporte Clínico Oficial - Óptica Zerzer</h1>
+                <p><strong>Especialidad:</strong> {categoria}</p>
+            </div>
+            <div>
+                {ultimo_reporte.replace(chr(10), '<br>')}
+            </div>
+            <div class="footer">
+                Aviso legal: Este reporte es una herramienta de asistencia profesional generada por el Asistente Clínico de Óptica Zerzer. Uso exclusivo profesional.
+            </div>
+        </body>
+        </html>
+        """
+        
+        b64 = base64.b64encode(html_contenido.encode('utf-8')).decode('utf-8')
+        nombre_archivo = f"Reporte_Clinico_Zerzer_{categoria.replace('/', '_').replace(' ', '_').replace('🔬 ', '').replace('🎯 ', '').replace('👁️ ', '').replace('👶 ', '').replace('🧠 ', '').replace('📚 ', '')}.html"
+        
+        href = f'''
+        <a href="data:text/html;base64,{b64}" download="{nombre_archivo}" style="text-decoration: none;">
+            <div style="background-color: #0d6efd; color: white; padding: 0.7rem; text-align: center; font-weight: bold; border-radius: 6px; width: 100%; margin-top: 20px; margin-bottom: 20px;">
+                📥 Descargar Reporte Clínico Completo (Formato PDF / Impresión)
+            </div>
+        </a>
+        '''
+        st.markdown(href, unsafe_allow_html=True)
+        st.info("💡 **Tip para imprimir:** Al abrir el archivo descargado en tu navegador, presioná **Ctrl + P** (o Cmd + P) y seleccioná **'Guardar como PDF'**.")
+
+        st.markdown("---")
+        st.markdown("### 🔄 Debate y Seguimiento Continuo del Caso")
+        st.write("Podés seguir escribiendo aquí abajo para debatir dudas, consultar detalles o llegar a una conclusión clínica definitiva con el asistente.")
+
+        pregunta_usuario = st.chat_input("Escribí tu consulta de seguimiento sobre este paciente...")
 
         if pregunta_usuario:
             if not API_KEY_SECRETA.strip():
@@ -237,10 +305,10 @@ if validar_acceso():
                 with st.chat_message("user"):
                     st.markdown(pregunta_usuario)
 
-                with st.spinner("🔍 [Analizando seguimiento en gabinete]..."):
+                with st.spinner("🔍 [Analizando respuesta en gabinete]..."):
                     prompt_sistema = f"""
                     Actúa como un profesor universitario de optometría y especialista experto en {categoria}.
-                    Responde al colega manteniendo la coherencia total con el caso clínico analizado previamente en la conversación.
+                    Responde al colega manteniendo coherencia total con el caso clínico analizado previamente y el historial de la conversación.
                     """
 
                     contents = [{"parts": [{"text": prompt_sistema}]}]
@@ -279,3 +347,5 @@ if validar_acceso():
                     st.rerun()
                 else:
                     st.error(respuesta_modelo)
+    else:
+        st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
