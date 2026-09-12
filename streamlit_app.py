@@ -17,7 +17,10 @@ st.set_page_config(
 # ----------------------------------------------------
 # CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
 # ----------------------------------------------------
-CLAVE_ACCESO = "optica2026"
+try:
+    CLAVE_ACCESO = st.secrets["CLAVE_ACCESO"]
+except Exception:
+    CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
 
 try:
     API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
@@ -227,8 +230,9 @@ if validar_acceso():
                             respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
                             break
                     except Exception as e:
+                        print(f"[ERROR interno - análisis inicial] {e}")  # queda en los logs del servidor, no en pantalla
                         if intento == 2:
-                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e}"
+                            respuesta_modelo = "⚠️ Ocurrió un inconveniente temporal con la API de IA. Probá de nuevo en unos segundos."
                         else:
                             time.sleep(2)
 
@@ -361,8 +365,9 @@ if validar_acceso():
                                 respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
                                 break
                         except Exception as e:
+                            print(f"[ERROR interno - seguimiento] {e}")  # queda en los logs del servidor, no en pantalla
                             if intento == 2:
-                                respuesta_modelo = f"⚠️ Error temporal: {e}"
+                                respuesta_modelo = "⚠️ Ocurrió un error temporal. Probá de nuevo en unos segundos."
                             else:
                                 time.sleep(2)
 
