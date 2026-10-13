@@ -17,7 +17,10 @@ st.set_page_config(
 # ----------------------------------------------------
 # CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
 # ----------------------------------------------------
-CLAVE_ACCESO = "optica2026"
+try:
+    CLAVE_ACCESO = st.secrets["CLAVE_ACCESO"]
+except Exception:
+    CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
 
 try:
     API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
@@ -90,7 +93,7 @@ if validar_acceso():
     if "categoria_anterior" not in st.session_state:
         st.session_state.categoria_anterior = ""
 
-    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos
+    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos Amplios
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
@@ -134,9 +137,9 @@ if validar_acceso():
 
         st.markdown("### 📝 Datos Clínicos del Paciente")
         caso_texto = st.text_area(
-            "Ingrese los parámetros y detalles del caso:",
-            placeholder="Ej: K1, K2, AV, síntomas, excentricidad, observaciones...",
-            height=120,
+            "Ingrese los parámetros y detalles extensos del caso:",
+            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual (podés escribir largo)...",
+            height=250,
             key="txt_caso"
         )
         
@@ -211,7 +214,7 @@ if validar_acceso():
                             }
                         })
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY_SECRETA}"
                 payload = {"contents": contents}
                 
                 respuesta_modelo = None
@@ -228,7 +231,18 @@ if validar_acceso():
                             break
                     except Exception as e:
                         if intento == 2:
-                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e}"
+                            try:
+                                url_fb = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
+                                req_fb = urllib.request.Request(
+                                    url_fb,
+                                    data=json.dumps(payload).encode('utf-8'),
+                                    headers={'Content-Type': 'application/json'}
+                                )
+                                with urllib.request.urlopen(req_fb) as response_fb:
+                                    res_data_fb = json.loads(response_fb.read().decode('utf-8'))
+                                    respuesta_modelo = res_data_fb['candidates'][0]['content']['parts'][0]['text']
+                            except Exception as e_fb:
+                                respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e_fb}"
                         else:
                             time.sleep(2)
 
@@ -239,7 +253,7 @@ if validar_acceso():
             else:
                 st.error(respuesta_modelo)
 
-    # VISUALIZACIÓN DE LA CONVERSACIÓN Y CHAT CONTINUO DE SEGUIMIENTO
+    # VISUALIZACIÓN DE LA CONVERSACIÓN Y SEGUIMIENTO AMPLIADO
     if len(st.session_state.mensajes) > 0:
         st.markdown("### 💬 Reporte Clínico y Conversación del Caso")
         
@@ -314,17 +328,21 @@ if validar_acceso():
 
         st.markdown("---")
         st.markdown("### 🔄 Debate y Seguimiento Continuo del Caso")
-        st.write("Podés seguir escribiendo aquí abajo para debatir dudas, consultar detalles o llegar a una conclusión clínica definitiva con el asistente.")
+        st.write("Escribí aquí abajo con total comodidad y amplitud tus dudas, evolución o consultas de seguimiento para debatir con el asistente:")
 
-        pregunta_usuario = st.chat_input("Escribí tu consulta de seguimiento sobre este paciente...")
+        with st.form(key="form_seguimiento", clear_on_submit=True):
+            pregunta_usuario = st.text_area(
+                "Consulta de seguimiento o debate clínico:",
+                placeholder="Escribí aquí tus dudas de seguimiento, evolución o nuevas mediciones (podés explayarte todo lo necesario)...",
+                height=150
+            )
+            enviar_seguimiento = st.form_submit_button("💬 Enviar Consulta de Seguimiento")
 
-        if pregunta_usuario:
+        if enviar_seguimiento and pregunta_usuario.strip():
             if not API_KEY_SECRETA.strip():
                 st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
             else:
                 st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
-                with st.chat_message("user"):
-                    st.markdown(pregunta_usuario)
 
                 with st.spinner("🔍 [Analizando respuesta en gabinete]..."):
                     prompt_sistema = f"""
@@ -340,7 +358,7 @@ if validar_acceso():
                             "parts": [{"text": msg["content"]}]
                         })
 
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={API_KEY_SECRETA}"
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY_SECRETA}"
                     payload = {"contents": contents}
                     
                     respuesta_modelo = None
@@ -355,16 +373,25 @@ if validar_acceso():
                                 res_data = json.loads(response.read().decode('utf-8'))
                                 respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
                                 break
-                    except Exception as e:
-                        if intento == 2:
-                            respuesta_modelo = f"⚠️ Error temporal: {e}"
-                        else:
-                            time.sleep(2)
+                        except Exception as e:
+                            if intento == 2:
+                                try:
+                                    url_fb = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
+                                    req_fb = urllib.request.Request(
+                                        url_fb,
+                                        data=json.dumps(payload).encode('utf-8'),
+                                        headers={'Content-Type': 'application/json'}
+                                    )
+                                    with urllib.request.urlopen(req_fb) as response_fb:
+                                        res_data_fb = json.loads(response_fb.read().decode('utf-8'))
+                                        respuesta_modelo = res_data_fb['candidates'][0]['content']['parts'][0]['text']
+                                except Exception as e_fb:
+                                    respuesta_modelo = f"⚠️ Error temporal: {e_fb}"
+                            else:
+                                time.sleep(2)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
-                    with st.chat_message("assistant"):
-                        st.markdown(respuesta_modelo)
                     st.rerun()
                 else:
                     st.error(respuesta_modelo)
