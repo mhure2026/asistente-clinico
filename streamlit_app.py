@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES (Con autolimpieza)
+# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
 # ----------------------------------------------------
 try:
     CLAVE_ACCESO = st.secrets["CLAVE_ACCESO"]
@@ -23,7 +23,6 @@ except Exception:
     CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
 
 try:
-    # Limpiamos automáticamente espacios o comillas accidentales
     API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
@@ -80,7 +79,7 @@ def consultar_gemini(payload, api_key):
                 return res_data['candidates'][0]['content']['parts'][0]['text']
         except Exception:
             continue
-    return "⚠️ Error al conectar con el servicio de IA. Verifique que la clave en Streamlit Secrets sea correcta y esté completa."
+    return "⚠️ Error al conectar con el servicio de IA. Verifique que la clave en Streamlit Secrets sea correcta."
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -354,4 +353,4 @@ if validar_acceso():
                 else:
                     st.error(respuesta_modelo)
     else:
-        st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")sis Clínico Profundo'** para iniciar el reporte.")
+        st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
