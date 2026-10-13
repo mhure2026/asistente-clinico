@@ -63,8 +63,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini_directo(payload, api_key):
-    # Modelos actuales vigentes en la API de Google
-    modelos_a_probar = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+    # Modelos vigentes oficiales actualizados
+    modelos_a_probar = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-1.5-flash", "gemini-pro"]
     
     for modelo in modelos_a_probar:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
