@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES (100% Oculto y Seguro)
+# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
 # ----------------------------------------------------
 try:
     CLAVE_ACCESO = st.secrets["CLAVE_ACCESO"]
@@ -65,9 +65,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini(payload, api_key):
-    """Función robusta con respaldo automático de modelos oficiales."""
     modelos = ["gemini-1.5-flash", "gemini-1.5-pro"]
-    
     for modelo in modelos:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
         try:
@@ -79,10 +77,9 @@ def consultar_gemini(payload, api_key):
             with urllib.request.urlopen(req) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 return res_data['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e:
+        except Exception:
             continue
-            
-    return "⚠️ Error al conectar con el servicio de IA. Verifique la clave configurada en el sistema."
+    return "⚠️ Error al conectar con el servicio de IA. Verifique los secretos configurados."
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -107,13 +104,12 @@ def validar_acceso():
     return True
 
 if validar_acceso():
-    # Inicialización de estados de sesión
     if "mensajes" not in st.session_state:
         st.session_state.mensajes = []
     if "categoria_anterior" not in st.session_state:
         st.session_state.categoria_anterior = ""
 
-    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos (Sin datos sensibles a la vista)
+    # BARRA LATERAL
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
@@ -202,7 +198,7 @@ if validar_acceso():
     # ACCIÓN DE GENERAR REPORTE INICIAL
     if boton_analizar:
         if not API_KEY_SECRETA.strip():
-            st.warning("⚠️ No se detectó la clave de API configurada de forma segura en el sistema.")
+            st.warning("⚠️ No se detectó la clave de API configurada en Streamlit Secrets.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
         else:
@@ -252,7 +248,7 @@ if validar_acceso():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-        # Generador de HTML limpio para descarga de PDF al pie del reporte
+        # Generador de HTML limpio para descarga de PDF
         ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
         
         texto_limpio_html = ultimo_reporte
@@ -330,7 +326,7 @@ if validar_acceso():
 
         if enviar_seguimiento and pregunta_usuario.strip():
             if not API_KEY_SECRETA.strip():
-                st.warning("⚠️ No se detectó la clave de API en el sistema.")
+                st.warning("⚠️ No se detectó la clave de API.")
             else:
                 st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
 
@@ -339,6 +335,25 @@ if validar_acceso():
                     Actúa como un profesor universitario de optometría y especialista experto en {categoria}.
                     Responde al colega manteniendo coherencia total con el caso clínico analizado previamente y el historial de la conversación.
                     """
+
+                    contents = [{"parts": [{"text": prompt_sistema}]}]
+                    for msg in st.session_state.mensajes:
+                        rol_gemini = "user" if msg["role"] == "user" else "model"
+                        contents.append({
+                            "role": rol_gemini,
+                            "parts": [{"text": msg["content"]}]
+                        })
+
+                    payload = {"contents": contents}
+                    respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
+
+                if respuesta_modelo and not "⚠️" in respuesta_modelo:
+                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
+                    st.rerun()
+                else:
+                    st.error(respuesta_modelo)
+    else:
+        st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
 
                     contents = [{"parts": [{"text": prompt_sistema}]}]
                     for msg in st.session_state.mensajes:
