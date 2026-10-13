@@ -1,10 +1,9 @@
 import os
 import time
-import json
 import base64
-import urllib.request
 import re
 import streamlit as st
+import google.generativeai as genai
 from PIL import Image
 
 st.set_page_config(
@@ -87,13 +86,12 @@ def validar_acceso():
     return True
 
 if validar_acceso():
-    # Inicialización de estados de sesión
     if "mensajes" not in st.session_state:
         st.session_state.mensajes = []
     if "categoria_anterior" not in st.session_state:
         st.session_state.categoria_anterior = ""
 
-    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos Amplios
+    # BARRA LATERAL
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
@@ -153,7 +151,7 @@ if validar_acceso():
         
         st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-    # PANEL PRINCIPAL: Presentación institucional, tiempos de análisis y reporte interactivo
+    # PANEL PRINCIPAL
     col_p1, col_p2 = st.columns([2, 1])
 
     with col_p1:
@@ -161,7 +159,7 @@ if validar_acceso():
         st.markdown(
             "Bienvenido colega a la plataforma avanzada de **Óptica Zerzer**. Este entorno exclusivo "
             "cruza la bibliografía internacional y los modelos de IA más avanzados para brindarle un soporte "
-            "diagnóstico y terapéutico de máxima jerarquía inalcanzable en su gabinete."
+            "diagnóstico y terapéutico de máxima jerarquía en su gabinete."
         )
 
     with col_p2:
@@ -202,40 +200,20 @@ if validar_acceso():
                 4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de revisiones y pronóstico visual esperado.
                 """
 
-                contents = [{"parts": [{"text": prompt_sistema}]}]
+                contents = [prompt_sistema]
                 if imagenes_subidas:
                     for img_file in imagenes_subidas:
-                        img_bytes = img_file.read()
-                        encoded = base64.b64encode(img_bytes).decode('utf-8')
-                        contents[0]["parts"].append({
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": encoded
-                            }
-                        })
+                        img = Image.open(img_file)
+                        contents.append(img)
 
-                # URL corregida con el modelo estable compatible
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
-                payload = {"contents": contents}
-                
                 respuesta_modelo = None
-                for intento in range(3):
-                    try:
-                        req = urllib.request.Request(
-                            url,
-                            data=json.dumps(payload).encode('utf-8'),
-                            headers={'Content-Type': 'application/json'}
-                        )
-                        with urllib.request.urlopen(req) as response:
-                            res_data = json.loads(response.read().decode('utf-8'))
-                            respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
-                            break
-                    except Exception as e:
-                        print(f"[ERROR interno - análisis inicial] {e}")
-                        if intento == 2:
-                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA: {str(e)}"
-                        else:
-                            time.sleep(2)
+                try:
+                    genai.configure(api_key=API_KEY_SECRETA)
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content(contents)
+                    respuesta_modelo = response.text
+                except Exception as e:
+                    respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA: {str(e)}"
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -340,35 +318,18 @@ if validar_acceso():
                     Responde al colega manteniendo coherencia total con el caso clínico analizado previamente y el historial de la conversación.
                     """
 
-                    contents = [{"parts": [{"text": prompt_sistema}]}]
+                    chat_history = [prompt_sistema]
                     for msg in st.session_state.mensajes:
-                        rol_gemini = "user" if msg["role"] == "user" else "model"
-                        contents.append({
-                            "role": rol_gemini,
-                            "parts": [{"text": msg["content"]}]
-                        })
+                        chat_history.append(msg["content"])
 
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
-                    payload = {"contents": contents}
-                    
                     respuesta_modelo = None
-                    for intento in range(3):
-                        try:
-                            req = urllib.request.Request(
-                                url,
-                                data=json.dumps(payload).encode('utf-8'),
-                                headers={'Content-Type': 'application/json'}
-                            )
-                            with urllib.request.urlopen(req) as response:
-                                res_data = json.loads(response.read().decode('utf-8'))
-                                respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
-                                break
-                        except Exception as e:
-                            print(f"[ERROR interno - seguimiento] {e}")
-                            if intento == 2:
-                                respuesta_modelo = f"⚠️ Ocurrió un error temporal: {str(e)}"
-                            else:
-                                time.sleep(2)
+                    try:
+                        genai.configure(api_key=API_KEY_SECRETA)
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        response = model.generate_content(chat_history)
+                        respuesta_modelo = response.text
+                    except Exception as e:
+                        respuesta_modelo = f"⚠️ Ocurrió un error temporal: {str(e)}"
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
