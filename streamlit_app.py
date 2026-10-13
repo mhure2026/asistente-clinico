@@ -64,6 +64,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def consultar_gemini(payload, api_key):
+    """Función robusta con fallback automático de modelos oficiales."""
+    modelos = ["gemini-1.5-flash", "gemini-1.5-pro"]
+    
+    for modelo in modelos:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                return res_data['candidates'][0]['content']['parts'][0]['text']
+        except Exception as e:
+            continue
+            
+    return "⚠️ Error al conectar con el servicio de IA. Por favor, verifique que la API Key en Streamlit Secrets sea válida."
+
 def validar_acceso():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
@@ -153,7 +173,7 @@ if validar_acceso():
         
         st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-    # PANEL PRINCIPAL: Presentación institucional, tiempos de análisis y reporte interactivo
+    # PANEL PRINCIPAL
     col_p1, col_p2 = st.columns([2, 1])
 
     with col_p1:
@@ -190,7 +210,7 @@ if validar_acceso():
                 
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, highly detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
 
                 Área Clínica Seleccionada: {categoria}
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
@@ -214,38 +234,8 @@ if validar_acceso():
                             }
                         })
 
-                # Endpoint actualizado a gemini-2.5-flash
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY_SECRETA}"
                 payload = {"contents": contents}
-                
-                respuesta_modelo = None
-                for intento in range(3):
-                    try:
-                        req = urllib.request.Request(
-                            url,
-                            data=json.dumps(payload).encode('utf-8'),
-                            headers={'Content-Type': 'application/json'}
-                        )
-                        with urllib.request.urlopen(req) as response:
-                            res_data = json.loads(response.read().decode('utf-8'))
-                            respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
-                            break
-                    except Exception as e:
-                        if intento == 2:
-                            try:
-                                url_fb = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={API_KEY_SECRETA}"
-                                req_fb = urllib.request.Request(
-                                    url_fb,
-                                    data=json.dumps(payload).encode('utf-8'),
-                                    headers={'Content-Type': 'application/json'}
-                                )
-                                with urllib.request.urlopen(req_fb) as response_fb:
-                                    res_data_fb = json.loads(response_fb.read().decode('utf-8'))
-                                    respuesta_modelo = res_data_fb['candidates'][0]['content']['parts'][0]['text']
-                            except Exception as e_fb:
-                                respuesta_modelo = f"⚠️ Ocurrió un inconveniente con la conexión a la API. Detalle: {e_fb}"
-                        else:
-                            time.sleep(2)
+                respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -265,7 +255,6 @@ if validar_acceso():
         # Generador de HTML limpio para descarga de PDF al pie del reporte
         ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
         
-        # Limpieza de código Markdown y LaTeX para impresión perfecta en HTML
         texto_limpio_html = ultimo_reporte
         texto_limpio_html = re.sub(r'#{1,6}\s*', '', texto_limpio_html)
         texto_limpio_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', texto_limpio_html)
@@ -359,26 +348,8 @@ if validar_acceso():
                             "parts": [{"text": msg["content"]}]
                         })
 
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY_SECRETA}"
                     payload = {"contents": contents}
-                    
-                    respuesta_modelo = None
-                    for intento in range(3):
-                        try:
-                            req = urllib.request.Request(
-                                url,
-                                data=json.dumps(payload).encode('utf-8'),
-                                headers={'Content-Type': 'application/json'}
-                            )
-                            with urllib.request.urlopen(req) as response:
-                                res_data = json.loads(response.read().decode('utf-8'))
-                                respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
-                                break
-                        except Exception as e:
-                            if intento == 2:
-                                respuesta_modelo = f"⚠️ Error temporal: {e}"
-                            else:
-                                time.sleep(2)
+                    respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
