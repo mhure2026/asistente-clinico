@@ -1,8 +1,10 @@
 import os
+import time
+import json
 import base64
+import urllib.request
 import re
 import streamlit as st
-import google.generativeai as genai
 from PIL import Image
 
 st.set_page_config(
@@ -21,9 +23,9 @@ except Exception:
     CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
 
 try:
-    API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
+    API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
 except Exception:
-    API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
+    API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "")
 # ----------------------------------------------------
 
 # Estética y blindaje profesional
@@ -62,16 +64,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def consultar_gemini_oficial(contents, api_key):
-    try:
-        genai.configure(api_key=api_key)
-        # Usamos el modelo oficial estable actual de la SDK de Google
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(contents)
-        return response.text
-    except Exception as e:
-        return f"⚠️ Error de conexión con Google: {str(e)}"
-
 def validar_acceso():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
@@ -95,12 +87,13 @@ def validar_acceso():
     return True
 
 if validar_acceso():
+    # Inicialización de estados de sesión
     if "mensajes" not in st.session_state:
         st.session_state.mensajes = []
     if "categoria_anterior" not in st.session_state:
         st.session_state.categoria_anterior = ""
 
-    # BARRA LATERAL
+    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos Amplios
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
@@ -145,7 +138,7 @@ if validar_acceso():
         st.markdown("### 📝 Datos Clínicos del Paciente")
         caso_texto = st.text_area(
             "Ingrese los parámetros y detalles extensos del caso:",
-            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual...",
+            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual (podés escribir largo)...",
             height=250,
             key="txt_caso"
         )
@@ -160,7 +153,7 @@ if validar_acceso():
         
         st.markdown('<p class="security-notice">Propiedad intelectual protegida.<br>© Óptica Zerzer. Uso exclusivo profesional.</p>', unsafe_allow_html=True)
 
-    # PANEL PRINCIPAL
+    # PANEL PRINCIPAL: Presentación institucional, tiempos de análisis y reporte interactivo
     col_p1, col_p2 = st.columns([2, 1])
 
     with col_p1:
@@ -168,7 +161,7 @@ if validar_acceso():
         st.markdown(
             "Bienvenido colega a la plataforma avanzada de **Óptica Zerzer**. Este entorno exclusivo "
             "cruza la bibliografía internacional y los modelos de IA más avanzados para brindarle un soporte "
-            "diagnóstico y terapéutico de máxima jerarquía en su gabinete."
+            "diagnóstico y terapéutico de máxima jerarquía inalcanzable en su gabinete."
         )
 
     with col_p2:
@@ -189,15 +182,15 @@ if validar_acceso():
     # ACCIÓN DE GENERAR REPORTE INICIAL
     if boton_analizar:
         if not API_KEY_SECRETA.strip():
-            st.warning("⚠️ No se detectó la clave de API configurada en Streamlit Secrets.")
+            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
         else:
-            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}]..."):
+            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
                 
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote en los criterios científicos y la bibliografía especializada.
 
                 Área Clínica Seleccionada: {categoria}
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
@@ -209,13 +202,40 @@ if validar_acceso():
                 4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de revisiones y pronóstico visual esperado.
                 """
 
-                contents = [prompt_sistema]
+                contents = [{"parts": [{"text": prompt_sistema}]}]
                 if imagenes_subidas:
                     for img_file in imagenes_subidas:
-                        img = Image.open(img_file)
-                        contents.append(img)
+                        img_bytes = img_file.read()
+                        encoded = base64.b64encode(img_bytes).decode('utf-8')
+                        contents[0]["parts"].append({
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": encoded
+                            }
+                        })
 
-                respuesta_modelo = consultar_gemini_oficial(contents, API_KEY_SECRETA)
+                # URL corregida con el modelo estable compatible
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
+                payload = {"contents": contents}
+                
+                respuesta_modelo = None
+                for intento in range(3):
+                    try:
+                        req = urllib.request.Request(
+                            url,
+                            data=json.dumps(payload).encode('utf-8'),
+                            headers={'Content-Type': 'application/json'}
+                        )
+                        with urllib.request.urlopen(req) as response:
+                            res_data = json.loads(response.read().decode('utf-8'))
+                            respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
+                            break
+                    except Exception as e:
+                        print(f"[ERROR interno - análisis inicial] {e}")
+                        if intento == 2:
+                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA: {str(e)}"
+                        else:
+                            time.sleep(2)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -232,7 +252,7 @@ if validar_acceso():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-        # Generador de HTML limpio para descarga de PDF
+        # Generador de HTML limpio para descarga de PDF al pie del reporte
         ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
         
         texto_limpio_html = ultimo_reporte
@@ -310,7 +330,7 @@ if validar_acceso():
 
         if enviar_seguimiento and pregunta_usuario.strip():
             if not API_KEY_SECRETA.strip():
-                st.warning("⚠️ No se detectó la clave de API.")
+                st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
             else:
                 st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
 
@@ -320,12 +340,35 @@ if validar_acceso():
                     Responde al colega manteniendo coherencia total con el caso clínico analizado previamente y el historial de la conversación.
                     """
 
-                    # Construir historial para la SDK oficial
-                    chat_history = [prompt_sistema]
+                    contents = [{"parts": [{"text": prompt_sistema}]}]
                     for msg in st.session_state.mensajes:
-                        chat_history.append(msg["content"])
+                        rol_gemini = "user" if msg["role"] == "user" else "model"
+                        contents.append({
+                            "role": rol_gemini,
+                            "parts": [{"text": msg["content"]}]
+                        })
 
-                    respuesta_modelo = consultar_gemini_oficial(chat_history, API_KEY_SECRETA)
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
+                    payload = {"contents": contents}
+                    
+                    respuesta_modelo = None
+                    for intento in range(3):
+                        try:
+                            req = urllib.request.Request(
+                                url,
+                                data=json.dumps(payload).encode('utf-8'),
+                                headers={'Content-Type': 'application/json'}
+                            )
+                            with urllib.request.urlopen(req) as response:
+                                res_data = json.loads(response.read().decode('utf-8'))
+                                respuesta_modelo = res_data['candidates'][0]['content']['parts'][0]['text']
+                                break
+                        except Exception as e:
+                            print(f"[ERROR interno - seguimiento] {e}")
+                            if intento == 2:
+                                respuesta_modelo = f"⚠️ Ocurrió un error temporal: {str(e)}"
+                            else:
+                                time.sleep(2)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
