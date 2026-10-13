@@ -63,8 +63,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini_directo(payload, api_key):
-    # Probamos de forma inteligente con los modelos estándar vigentes
-    modelos_a_probar = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro"]
+    # Modelos actuales vigentes en la API de Google
+    modelos_a_probar = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
     
     for modelo in modelos_a_probar:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
@@ -80,7 +80,7 @@ def consultar_gemini_directo(payload, api_key):
         except Exception:
             continue
             
-    return "⚠️ Error técnico: No se pudo establecer conexión con los modelos de IA disponibles."
+    return "⚠️ Error técnico: No se pudo establecer conexión con los modelos vigentes de IA."
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
