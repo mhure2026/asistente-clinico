@@ -354,22 +354,3 @@ if validar_acceso():
                     st.error(respuesta_modelo)
     else:
         st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
-
-                    contents = [{"parts": [{"text": prompt_sistema}]}]
-                    for msg in st.session_state.mensajes:
-                        rol_gemini = "user" if msg["role"] == "user" else "model"
-                        contents.append({
-                            "role": rol_gemini,
-                            "parts": [{"text": msg["content"]}]
-                        })
-
-                    payload = {"contents": contents}
-                    respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
-
-                if respuesta_modelo and not "⚠️" in respuesta_modelo:
-                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
-                    st.rerun()
-                else:
-                    st.error(respuesta_modelo)
-    else:
-        st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
