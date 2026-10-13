@@ -63,19 +63,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini_directo(payload, api_key):
-    # Usamos la API oficial v1 que soporta todas las claves de AI Studio
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            return res_data['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        return f"⚠️ Error técnico de conexión: {str(e)}"
+    # Probamos de forma inteligente con los modelos estándar vigentes
+    modelos_a_probar = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-pro"]
+    
+    for modelo in modelos_a_probar:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                return res_data['candidates'][0]['content']['parts'][0]['text']
+        except Exception:
+            continue
+            
+    return "⚠️ Error técnico: No se pudo establecer conexión con los modelos de IA disponibles."
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
