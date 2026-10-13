@@ -1,9 +1,9 @@
 import os
-import json
 import base64
-import urllib.request
 import re
 import streamlit as st
+import google.generativeai as genai
+from PIL import Image
 
 st.set_page_config(
     page_title="Asistente Clínico | Óptica Zerzer",
@@ -62,32 +62,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def consultar_gemini_oficial(payload, api_key):
-    # Conexión directa y actualizada con el modelo oficial
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+def consultar_gemini_oficial(contents, api_key):
     try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            return res_data['candidates'][0]['content']['parts'][0]['text']
+        genai.configure(api_key=api_key)
+        # Usamos el modelo oficial estable actual de la SDK de Google
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(contents)
+        return response.text
     except Exception as e:
-        # Fallback de respaldo a v1
-        try:
-            url_alt = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
-            req_alt = urllib.request.Request(
-                url_alt,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req_alt) as response_alt:
-                res_data_alt = json.loads(response_alt.read().decode('utf-8'))
-                return res_data_alt['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e_alt:
-            return f"⚠️ Error de conexión con Google: {str(e_alt)}"
+        return f"⚠️ Error de conexión con Google: {str(e)}"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -226,20 +209,13 @@ if validar_acceso():
                 4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de revisiones y pronóstico visual esperado.
                 """
 
-                contents = [{"parts": [{"text": prompt_sistema}]}]
+                contents = [prompt_sistema]
                 if imagenes_subidas:
                     for img_file in imagenes_subidas:
-                        img_bytes = img_file.read()
-                        encoded = base64.b64encode(img_bytes).decode('utf-8')
-                        contents[0]["parts"].append({
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": encoded
-                            }
-                        })
+                        img = Image.open(img_file)
+                        contents.append(img)
 
-                payload = {"contents": contents}
-                respuesta_modelo = consultar_gemini_oficial(payload, API_KEY_SECRETA)
+                respuesta_modelo = consultar_gemini_oficial(contents, API_KEY_SECRETA)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -344,16 +320,12 @@ if validar_acceso():
                     Responde al colega manteniendo coherencia total con el caso clínico analizado previamente y el historial de la conversación.
                     """
 
-                    contents = [{"parts": [{"text": prompt_sistema}]}]
+                    # Construir historial para la SDK oficial
+                    chat_history = [prompt_sistema]
                     for msg in st.session_state.mensajes:
-                        rol_gemini = "user" if msg["role"] == "user" else "model"
-                        contents.append({
-                            "role": rol_gemini,
-                            "parts": [{"text": msg["content"]}]
-                        })
+                        chat_history.append(msg["content"])
 
-                    payload = {"contents": contents}
-                    respuesta_modelo = consultar_gemini_oficial(payload, API_KEY_SECRETA)
+                    respuesta_modelo = consultar_gemini_oficial(chat_history, API_KEY_SECRETA)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
