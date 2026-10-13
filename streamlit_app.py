@@ -63,8 +63,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini_oficial(payload, api_key):
-    # Conexión directa y robusta con el modelo oficial estable
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Conexión directa y actualizada con el modelo oficial
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     try:
         req = urllib.request.Request(
             url,
@@ -75,7 +75,19 @@ def consultar_gemini_oficial(payload, api_key):
             res_data = json.loads(response.read().decode('utf-8'))
             return res_data['candidates'][0]['content']['parts'][0]['text']
     except Exception as e:
-        return f"⚠️ Error de conexión con Google: {str(e)}"
+        # Fallback de respaldo a v1
+        try:
+            url_alt = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+            req_alt = urllib.request.Request(
+                url_alt,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req_alt) as response_alt:
+                res_data_alt = json.loads(response_alt.read().decode('utf-8'))
+                return res_data_alt['candidates'][0]['content']['parts'][0]['text']
+        except Exception as e_alt:
+            return f"⚠️ Error de conexión con Google: {str(e_alt)}"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -198,7 +210,7 @@ if validar_acceso():
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
         else:
-            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
+            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}]..."):
                 
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
