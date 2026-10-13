@@ -214,7 +214,8 @@ if validar_acceso():
                             }
                         })
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY_SECRETA}"
+                # URL oficial con gemini-1.5-flash
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
                 payload = {"contents": contents}
                 
                 respuesta_modelo = None
@@ -231,18 +232,7 @@ if validar_acceso():
                             break
                     except Exception as e:
                         if intento == 2:
-                            try:
-                                url_fb = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
-                                req_fb = urllib.request.Request(
-                                    url_fb,
-                                    data=json.dumps(payload).encode('utf-8'),
-                                    headers={'Content-Type': 'application/json'}
-                                )
-                                with urllib.request.urlopen(req_fb) as response_fb:
-                                    res_data_fb = json.loads(response_fb.read().decode('utf-8'))
-                                    respuesta_modelo = res_data_fb['candidates'][0]['content']['parts'][0]['text']
-                            except Exception as e_fb:
-                                respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA. Detalle técnico: {e_fb}"
+                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente con la conexión a la API. Detalle: {e}"
                         else:
                             time.sleep(2)
 
@@ -358,7 +348,7 @@ if validar_acceso():
                             "parts": [{"text": msg["content"]}]
                         })
 
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY_SECRETA}"
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
                     payload = {"contents": contents}
                     
                     respuesta_modelo = None
@@ -375,18 +365,7 @@ if validar_acceso():
                                 break
                         except Exception as e:
                             if intento == 2:
-                                try:
-                                    url_fb = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
-                                    req_fb = urllib.request.Request(
-                                        url_fb,
-                                        data=json.dumps(payload).encode('utf-8'),
-                                        headers={'Content-Type': 'application/json'}
-                                    )
-                                    with urllib.request.urlopen(req_fb) as response_fb:
-                                        res_data_fb = json.loads(response_fb.read().decode('utf-8'))
-                                        respuesta_modelo = res_data_fb['candidates'][0]['content']['parts'][0]['text']
-                                except Exception as e_fb:
-                                    respuesta_modelo = f"⚠️ Error temporal: {e_fb}"
+                                respuesta_modelo = f"⚠️ Error temporal: {e}"
                             else:
                                 time.sleep(2)
 
