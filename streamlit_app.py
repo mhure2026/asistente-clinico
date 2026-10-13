@@ -1,10 +1,11 @@
 import os
 import time
+import json
 import base64
+import urllib.request
 import re
 import streamlit as st
-from google import genai
-from google.genai import types
+from PIL import Image
 
 st.set_page_config(
     page_title="Asistente Clínico | Óptica Zerzer",
@@ -63,13 +64,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def obtener_cliente():
-    if not API_KEY_SECRETA:
-        return None
-    try:
-        return genai.Client(api_key=API_KEY_SECRETA)
-    except Exception:
-        return None
+def consultar_gemini(payload, api_key):
+    modelos = ["gemini-1.5-flash", "gemini-1.5-pro"]
+    for modelo in modelos:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                return res_data['candidates'][0]['content']['parts'][0]['text']
+        except Exception:
+            continue
+    return "⚠️ Error al conectar con el servicio de IA. Verifique que la clave en Streamlit Secrets sea correcta."
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -187,8 +197,7 @@ if validar_acceso():
 
     # ACCIÓN DE GENERAR REPORTE INICIAL
     if boton_analizar:
-        client = obtener_cliente()
-        if not client:
+        if not API_KEY_SECRETA.strip():
             st.warning("⚠️ No se detectó la clave de API configurada en Streamlit Secrets.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
@@ -209,36 +218,27 @@ if validar_acceso():
                 4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de revisiones y pronóstico visual esperado.
                 """
 
-                contents = [prompt_sistema]
+                contents = [{"parts": [{"text": prompt_sistema}]}]
                 if imagenes_subidas:
                     for img_file in imagenes_subidas:
                         img_bytes = img_file.read()
-                        contents.append(
-                            types.Part.from_bytes(
-                                data=img_bytes,
-                                mime_type=img_file.type
-                            )
-                        )
+                        encoded = base64.b64encode(img_bytes).decode('utf-8')
+                        contents[0]["parts"].append({
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": encoded
+                            }
+                        })
 
-                respuesta_texto = ""
-                for model_id in ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash"]:
-                    try:
-                        res = client.models.generate_content(
-                            model=model_id,
-                            contents=contents
-                        )
-                        if res and res.text:
-                            respuesta_texto = res.text
-                            break
-                    except Exception:
-                        continue
+                payload = {"contents": contents}
+                respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
 
-            if respuesta_texto:
+            if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
-                st.session_state.mensajes.append({"role": "assistant", "content": respuesta_texto})
+                st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
                 st.rerun()
             else:
-                st.error("⚠️ Error al conectar con el servicio de IA. Verifique que la clave en Streamlit Secrets sea correcta.")
+                st.error(respuesta_modelo)
 
     # VISUALIZACIÓN DE LA CONVERSACIÓN Y SEGUIMIENTO AMPLIADO
     if len(st.session_state.mensajes) > 0:
@@ -325,8 +325,7 @@ if validar_acceso():
             enviar_seguimiento = st.form_submit_button("💬 Enviar Consulta de Seguimiento")
 
         if enviar_seguimiento and pregunta_usuario.strip():
-            client = obtener_cliente()
-            if not client:
+            if not API_KEY_SECRETA.strip():
                 st.warning("⚠️ No se detectó la clave de API.")
             else:
                 st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
@@ -337,27 +336,21 @@ if validar_acceso():
                     Responde al colega manteniendo coherencia total con el caso clínico analizado previamente y el historial de la conversación.
                     """
 
-                    contents = [prompt_sistema]
+                    contents = [{"parts": [{"text": prompt_sistema}]}]
                     for msg in st.session_state.mensajes:
-                        contents.append(f"{msg['role'].upper()}: {msg['content']}")
+                        rol_gemini = "user" if msg["role"] == "user" else "model"
+                        contents.append({
+                            "role": rol_gemini,
+                            "parts": [{"text": msg["content"]}]
+                        })
 
-                    respuesta_texto = ""
-                    for model_id in ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash"]:
-                        try:
-                            res = client.models.generate_content(
-                                model=model_id,
-                                contents=contents
-                            )
-                            if res and res.text:
-                                respuesta_texto = res.text
-                                break
-                        except Exception:
-                            continue
+                    payload = {"contents": contents}
+                    respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
 
-                if respuesta_texto:
-                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_texto})
+                if respuesta_modelo and not "⚠️" in respuesta_modelo:
+                    st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
                     st.rerun()
                 else:
-                    st.error("⚠️ Error temporal al responder. Intente nuevamente.")
+                    st.error(respuesta_modelo)
     else:
         st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
