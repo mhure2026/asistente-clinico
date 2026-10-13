@@ -190,7 +190,7 @@ if validar_acceso():
                 
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+                Tu tarea es realizar un análisis exhaustivo, highly detallado, estructurado y de rigor clínico absoluto para un colega profesional.
 
                 Área Clínica Seleccionada: {categoria}
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
@@ -214,8 +214,8 @@ if validar_acceso():
                             }
                         })
 
-                # URL oficial con gemini-1.5-flash
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
+                # Endpoint actualizado a gemini-2.5-flash
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY_SECRETA}"
                 payload = {"contents": contents}
                 
                 respuesta_modelo = None
@@ -232,7 +232,18 @@ if validar_acceso():
                             break
                     except Exception as e:
                         if intento == 2:
-                            respuesta_modelo = f"⚠️ Ocurrió un inconveniente con la conexión a la API. Detalle: {e}"
+                            try:
+                                url_fb = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={API_KEY_SECRETA}"
+                                req_fb = urllib.request.Request(
+                                    url_fb,
+                                    data=json.dumps(payload).encode('utf-8'),
+                                    headers={'Content-Type': 'application/json'}
+                                )
+                                with urllib.request.urlopen(req_fb) as response_fb:
+                                    res_data_fb = json.loads(response_fb.read().decode('utf-8'))
+                                    respuesta_modelo = res_data_fb['candidates'][0]['content']['parts'][0]['text']
+                            except Exception as e_fb:
+                                respuesta_modelo = f"⚠️ Ocurrió un inconveniente con la conexión a la API. Detalle: {e_fb}"
                         else:
                             time.sleep(2)
 
@@ -348,7 +359,7 @@ if validar_acceso():
                             "parts": [{"text": msg["content"]}]
                         })
 
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY_SECRETA}"
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY_SECRETA}"
                     payload = {"contents": contents}
                     
                     respuesta_modelo = None
