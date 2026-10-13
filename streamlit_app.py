@@ -62,25 +62,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def consultar_gemini_directo(payload, api_key):
-    # Modelos vigentes oficiales actualizados
-    modelos_a_probar = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-1.5-flash", "gemini-pro"]
-    
-    for modelo in modelos_a_probar:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                return res_data['candidates'][0]['content']['parts'][0]['text']
-        except Exception:
-            continue
-            
-    return "⚠️ Error técnico: No se pudo establecer conexión con los modelos vigentes de IA."
+def consultar_gemini_oficial(payload, api_key):
+    # Conexión directa y robusta con el modelo oficial estable
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            return res_data['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        return f"⚠️ Error de conexión con Google: {str(e)}"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -232,7 +227,7 @@ if validar_acceso():
                         })
 
                 payload = {"contents": contents}
-                respuesta_modelo = consultar_gemini_directo(payload, API_KEY_SECRETA)
+                respuesta_modelo = consultar_gemini_oficial(payload, API_KEY_SECRETA)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -346,7 +341,7 @@ if validar_acceso():
                         })
 
                     payload = {"contents": contents}
-                    respuesta_modelo = consultar_gemini_directo(payload, API_KEY_SECRETA)
+                    respuesta_modelo = consultar_gemini_oficial(payload, API_KEY_SECRETA)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
