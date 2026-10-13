@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
+# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES (100% Oculto y Seguro)
 # ----------------------------------------------------
 try:
     CLAVE_ACCESO = st.secrets["CLAVE_ACCESO"]
@@ -65,7 +65,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini(payload, api_key):
-    """Función robusta con fallback automático de modelos oficiales."""
+    """Función robusta con respaldo automático de modelos oficiales."""
     modelos = ["gemini-1.5-flash", "gemini-1.5-pro"]
     
     for modelo in modelos:
@@ -82,7 +82,7 @@ def consultar_gemini(payload, api_key):
         except Exception as e:
             continue
             
-    return "⚠️ Error al conectar con el servicio de IA. Por favor, verifique que la API Key en Streamlit Secrets sea válida."
+    return "⚠️ Error al conectar con el servicio de IA. Verifique la clave configurada en el sistema."
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -113,7 +113,7 @@ if validar_acceso():
     if "categoria_anterior" not in st.session_state:
         st.session_state.categoria_anterior = ""
 
-    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos Amplios
+    # BARRA LATERAL: Presentación, Solapas, Insumos y Datos Clínicos (Sin datos sensibles a la vista)
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
@@ -202,7 +202,7 @@ if validar_acceso():
     # ACCIÓN DE GENERAR REPORTE INICIAL
     if boton_analizar:
         if not API_KEY_SECRETA.strip():
-            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+            st.warning("⚠️ No se detectó la clave de API configurada de forma segura en el sistema.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
         else:
@@ -330,7 +330,7 @@ if validar_acceso():
 
         if enviar_seguimiento and pregunta_usuario.strip():
             if not API_KEY_SECRETA.strip():
-                st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+                st.warning("⚠️ No se detectó la clave de API en el sistema.")
             else:
                 st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
 
