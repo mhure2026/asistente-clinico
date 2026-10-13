@@ -1,11 +1,9 @@
 import os
-import time
 import json
 import base64
 import urllib.request
 import re
 import streamlit as st
-from PIL import Image
 
 st.set_page_config(
     page_title="Asistente Clínico | Óptica Zerzer",
@@ -64,23 +62,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def consultar_gemini(payload, api_key):
-    # Usamos los modelos actuales actualizados y estables
-    modelos = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-    for modelo in modelos:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                return res_data['candidates'][0]['content']['parts'][0]['text']
-        except Exception:
-            continue
-    return None
+def consultar_gemini_directo(payload, api_key):
+    # Usamos la API oficial v1 que soporta todas las claves de AI Studio
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            return res_data['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        return f"⚠️ Error técnico de conexión: {str(e)}"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -155,7 +150,7 @@ if validar_acceso():
         st.markdown("### 📝 Datos Clínicos del Paciente")
         caso_texto = st.text_area(
             "Ingrese los parámetros y detalles extensos del caso:",
-            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual (podés escribir largo)...",
+            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual...",
             height=250,
             key="txt_caso"
         )
@@ -232,14 +227,14 @@ if validar_acceso():
                         })
 
                 payload = {"contents": contents}
-                respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
+                respuesta_modelo = consultar_gemini_directo(payload, API_KEY_SECRETA)
 
-            if respuesta_modelo:
+            if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
                 st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
                 st.rerun()
             else:
-                st.error("⚠️ Error de conexión con la IA. Verifique que la clave en Streamlit Secrets sea válida y esté activa.")
+                st.error(respuesta_modelo)
 
     # VISUALIZACIÓN DE LA CONVERSACIÓN Y SEGUIMIENTO AMPLIADO
     if len(st.session_state.mensajes) > 0:
@@ -320,7 +315,7 @@ if validar_acceso():
         with st.form(key="form_seguimiento", clear_on_submit=True):
             pregunta_usuario = st.text_area(
                 "Consulta de seguimiento o debate clínico:",
-                placeholder="Escribí aquí tus dudas de seguimiento, evolución o nuevas mediciones (podés explayarte todo lo necesario)...",
+                placeholder="Escribí aquí tus dudas de seguimiento, evolución o nuevas mediciones...",
                 height=150
             )
             enviar_seguimiento = st.form_submit_button("💬 Enviar Consulta de Seguimiento")
@@ -346,12 +341,12 @@ if validar_acceso():
                         })
 
                     payload = {"contents": contents}
-                    respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
+                    respuesta_modelo = consultar_gemini_directo(payload, API_KEY_SECRETA)
 
-                if respuesta_modelo:
+                if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
                     st.rerun()
                 else:
-                    st.error("⚠️ Error temporal al responder. Intente nuevamente.")
+                    st.error(respuesta_modelo)
     else:
         st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
