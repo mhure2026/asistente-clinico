@@ -65,7 +65,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def consultar_gemini(payload, api_key):
-    modelos = ["gemini-1.5-flash", "gemini-1.5-pro"]
+    # Usamos los modelos actuales actualizados y estables
+    modelos = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
     for modelo in modelos:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"
         try:
@@ -79,7 +80,7 @@ def consultar_gemini(payload, api_key):
                 return res_data['candidates'][0]['content']['parts'][0]['text']
         except Exception:
             continue
-    return "⚠️ Error al conectar con el servicio de IA. Verifique que la clave en Streamlit Secrets sea correcta."
+    return None
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -233,12 +234,12 @@ if validar_acceso():
                 payload = {"contents": contents}
                 respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
 
-            if respuesta_modelo and not "⚠️" in respuesta_modelo:
+            if respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
                 st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
                 st.rerun()
             else:
-                st.error(respuesta_modelo)
+                st.error("⚠️ Error de conexión con la IA. Verifique que la clave en Streamlit Secrets sea válida y esté activa.")
 
     # VISUALIZACIÓN DE LA CONVERSACIÓN Y SEGUIMIENTO AMPLIADO
     if len(st.session_state.mensajes) > 0:
@@ -347,10 +348,10 @@ if validar_acceso():
                     payload = {"contents": contents}
                     respuesta_modelo = consultar_gemini(payload, API_KEY_SECRETA)
 
-                if respuesta_modelo and not "⚠️" in respuesta_modelo:
+                if respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
                     st.rerun()
                 else:
-                    st.error(respuesta_modelo)
+                    st.error("⚠️ Error temporal al responder. Intente nuevamente.")
     else:
         st.info("👈 Completá los datos clínicos y las fotografías en la barra lateral, seleccioná la especialidad y hacé clic en **'Generar Análisis Clínico Profundo'** para iniciar el reporte.")
