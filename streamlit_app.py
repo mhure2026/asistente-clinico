@@ -3,8 +3,6 @@ import re
 import base64
 import streamlit as st
 import google.generativeai as genai
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
 from PIL import Image
 
 st.set_page_config(
@@ -31,16 +29,6 @@ try:
     API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
-
-# Diccionario de subcarpetas en Google Drive dentro de "LIBROS GEM"
-MAPEO_CARPETAS_DRIVE = {
-    "🔬 Adaptación de Rígidas y Topografía": "Adaptacion_Rigidas_y_Topografia",
-    "🎯 Terapia Visual": "Terapia_Visual",
-    "👁️ Baja Visión": "Baja_Vision",
-    "👶 Pediatría": "Pediatria",
-    "🧠 Neurología": "Neurologia",
-    "📚 General y Clínica": "General_y_Clinica"
-}
 # ----------------------------------------------------
 
 # Estética y blindaje profesional
@@ -90,7 +78,7 @@ def validar_acceso():
         with col2:
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.markdown("### 👁️ Óptica Zerzer - Asistente Clínico Optométrico")
-            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor. Validación de membresía requerida.")
+            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor. Validación requerida.")
             
             password = st.text_input("Ingresá tu contraseña de acceso:", type="password")
             
@@ -134,7 +122,14 @@ if validar_acceso():
         
         categoria = st.selectbox(
             "Área clínica a consultar:",
-            list(MAPEO_CARPETAS_DRIVE.keys())
+            [
+                "🔬 Adaptación de Rígidas y Topografía",
+                "🎯 Terapia Visual",
+                "👁️ Baja Visión",
+                "👶 Pediatría",
+                "🧠 Neurología",
+                "📚 General y Clínica"
+            ]
         )
         
         if st.session_state.categoria_anterior != categoria:
@@ -208,7 +203,7 @@ if validar_acceso():
                 
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote en los protocolos de la biblioteca clínica de Óptica Zerzer para el área de {categoria}.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote en los protocolos especializados de la biblioteca clínica de Óptica Zerzer.
 
                 Área Clínica Seleccionada: {categoria}
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
