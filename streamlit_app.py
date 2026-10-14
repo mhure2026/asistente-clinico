@@ -265,8 +265,8 @@ if validar_acceso():
 
                 try:
                     genai.configure(api_key=API_KEY_SECRETA)
-                    # Modelo actualizado a gemini-1.5-flash según recomendación
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # Modelo actualizado a gemini-2.0-flash según recomendación
+                    model = genai.GenerativeModel('gemini-2.0-flash')
                     response = model.generate_content(contents_input)
                     respuesta_modelo = response.text
                 except Exception as e:
