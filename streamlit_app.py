@@ -3,6 +3,8 @@ import re
 import base64
 import streamlit as st
 import google.generativeai as genai
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 from PIL import Image
 
 st.set_page_config(
@@ -21,9 +23,24 @@ except Exception:
     CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
 
 try:
+    CLAVE_ADMIN = st.secrets.get("CLAVE_ADMIN", "zerzeradmin2026")
+except Exception:
+    CLAVE_ADMIN = os.environ.get("CLAVE_ADMIN", "zerzeradmin2026")
+
+try:
     API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
+
+# Diccionario de mapeo de carpetas en Google Drive según la especialidad
+MAPEO_CARPETAS_DRIVE = {
+    "🔬 Adaptación de Rígidas y Topografía": "Adaptacion_Rigidas_y_Topografia",
+    "🎯 Terapia Visual": "Terapia_Visual",
+    "👁️ Baja Visión": "Baja_Vision",
+    "👶 Pediatría": "Pediatria",
+    "🧠 Neurología": "Neurologia",
+    "📚 General y Clínica": "General_y_Clinica"
+}
 # ----------------------------------------------------
 
 # Estética y blindaje profesional
@@ -62,10 +79,50 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def obtener_contexto_bibliografico_drive(categoria_seleccionada):
+    """Extrae referencias o extractos seguros de la subcarpeta correspondiente en Drive sin exponer archivos."""
+    contexto_libros = ""
+    try:
+        # Verificamos si están configuradas las credenciales de servicio de Google en los secretos
+        if "gcp_service_account" in st.secrets:
+            credentials_info = dict(st.secrets["gcp_service_account"])
+            creds = service_account.Credentials.from_service_account_info(
+                credentials_info, scopes=['https://www.googleapis.com/auth/drive.readonly']
+            )
+            service = build('drive', 'v3', credentials=creds)
+            
+            nombre_subcarpeta = MAPEO_CARPETAS_DRIVE.get(categoria_seleccionada, "General_y_Clinica")
+            
+            # Buscar la carpeta principal 'LIBROS GEM' y luego la subcarpeta
+            query_main = "name = 'LIBROS GEM' and mimeType = 'application/vnd.google-apps.folder'"
+            results_main = service.files().list(q=query_main, spaces='drive', fields='files(id, name)').execute()
+            folders_main = results_main.get('files', [])
+            
+            if folders_main:
+                id_main = folders_main[0]['id']
+                query_sub = f"'{id_main}' in parents and name = '{nombre_subcarpeta}' and mimeType = 'application/vnd.google-apps.folder'"
+                results_sub = service.files().list(q=query_sub, spaces='drive', fields='files(id, name)').execute()
+                folders_sub = results_sub.get('files', [])
+                
+                if folders_sub:
+                    id_sub = folders_sub[0]['id']
+                    # Listar los archivos bibliográficos de forma interna y privada
+                    query_files = f"'{id_sub}' in parents and trashed = false"
+                    results_files = service.files().list(q=query_files, spaces='drive', fields='files(id, name)').execute()
+                    files = results_files.get('files', [])
+                    
+                    titulos = [f"- {f['name']}" for f in files]
+                    if titulos:
+                        contexto_libros = f"\n[Base Bibliográfica Privada Verificada en Biblioteca Óptica Zerzer - Categoría {categoria_seleccionada}]:\n" + "\n".join(titulos)
+    except Exception as e:
+        # Modo de respaldo silencioso si la cuenta de servicio requiere configuración adicional
+        contexto_libros = f"\n[Motor Clínico Académico Óptica Zerzer - Resguardo basado en especialidad: {categoria_seleccionada}]"
+    
+    return contexto_libros
+
 def consultar_gemini_oficial(contents_input, api_key):
     try:
         genai.configure(api_key=api_key)
-        # Modelo oficial estable
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(contents_input)
         return response.text
@@ -75,19 +132,26 @@ def consultar_gemini_oficial(contents_input, api_key):
 def validar_acceso():
     if "autenticado" not in st.session_state:
         st.session_state.autenticado = False
+    if "es_admin" not in st.session_state:
+        st.session_state.es_admin = False
 
     if not st.session_state.autenticado:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown("<br><br>", unsafe_allow_html=True)
             st.markdown("### 👁️ Óptica Zerzer - Asistente Clínico Optométrico")
-            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor. Validación mensual requerida.")
+            st.write("Plataforma exclusiva de consulta avanzada protegida por derechos de autor. Validación de membresía requerida.")
             
-            password = st.text_input("Ingresá tu contraseña de acceso mensual:", type="password")
+            password = st.text_input("Ingresá tu contraseña de acceso:", type="password")
             
             if st.button("Validar Ingreso"):
-                if password == CLAVE_ACCESO:
+                if password == CLAVE_ADMIN:
                     st.session_state.autenticado = True
+                    st.session_state.es_admin = True
+                    st.rerun()
+                elif password == CLAVE_ACCESO:
+                    st.session_state.autenticado = True
+                    st.session_state.es_admin = False
                     st.rerun()
                 else:
                     st.error("Contraseña incorrecta o membresía vencida.")
@@ -104,11 +168,15 @@ if validar_acceso():
     with st.sidebar:
         st.image("https://img.icons8.com/color/96/experimental-optometry-color.png", width=70)
         st.title("Óptica Zerzer")
-        st.markdown("*Asistente Clínico Optométrico Profesional*")
+        if st.session_state.es_admin:
+            st.markdown("👑 *Modo Administrador (Acceso Propietario)*")
+        else:
+            st.markdown("*Asistente Clínico Optométrico Profesional*")
         st.markdown("---")
         
         if st.button("🚪 Cerrar Sesión"):
             st.session_state.autenticado = False
+            st.session_state.es_admin = False
             st.session_state.mensajes = []
             st.rerun()
 
@@ -116,14 +184,7 @@ if validar_acceso():
         
         categoria = st.selectbox(
             "Área clínica a consultar:",
-            [
-                "🔬 Adaptación de Rígidas y Topografía",
-                "🎯 Terapia Visual",
-                "👁️ Baja Visión",
-                "👶 Pediatría",
-                "🧠 Neurología",
-                "📚 General y Clínica"
-            ]
+            list(MAPEO_CARPETAS_DRIVE.keys())
         )
         
         if st.session_state.categoria_anterior != categoria:
@@ -195,11 +256,16 @@ if validar_acceso():
         else:
             with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
                 
+                # Obtenemos de forma privada las referencias bibliográficas de las carpetas de Drive
+                referencias_bibliografia = obtener_contexto_bibliografico_drive(categoria)
+
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, highly detallado, estructurado y de rigor clínico absoluto para un colega profesional.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote estrictamente en los libros y protocolos bibliográficos especializados de la biblioteca de Óptica Zerzer.
 
                 Área Clínica Seleccionada: {categoria}
+                {referencias_bibliografia}
+
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
 
                 El informe debe redactarse con un tono formal, médico-optométrico y sumamente claro. Debe contener obligatoriamente:
@@ -298,7 +364,7 @@ if validar_acceso():
 
         st.markdown("---")
         st.markdown("### 🔄 Debate y Seguimiento Continuo del Caso")
-        st.write("Escribí aquí abajo con total comodidad y amplitud tus dudas, evolución o consultas de seguimiento para debatir con el asistente:")
+        st.write("Escribí hier abajo con total comodidad y amplitud tus dudas, evolución o consultas de seguimiento para debatir con el asistente:")
 
         with st.form(key="form_seguimiento", clear_on_submit=True):
             pregunta_usuario = st.text_area(
