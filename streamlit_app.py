@@ -32,7 +32,7 @@ try:
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
 
-# Diccionario de mapeo de carpetas en Google Drive según la especialidad
+# Diccionario de subcarpetas en Google Drive dentro de "LIBROS GEM"
 MAPEO_CARPETAS_DRIVE = {
     "🔬 Adaptación de Rígidas y Topografía": "Adaptacion_Rigidas_y_Topografia",
     "🎯 Terapia Visual": "Terapia_Visual",
@@ -78,56 +78,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-def obtener_contexto_bibliografico_drive(categoria_seleccionada):
-    """Extrae referencias o extractos seguros de la subcarpeta correspondiente en Drive sin exponer archivos."""
-    contexto_libros = ""
-    try:
-        # Verificamos si están configuradas las credenciales de servicio de Google en los secretos
-        if "gcp_service_account" in st.secrets:
-            credentials_info = dict(st.secrets["gcp_service_account"])
-            creds = service_account.Credentials.from_service_account_info(
-                credentials_info, scopes=['https://www.googleapis.com/auth/drive.readonly']
-            )
-            service = build('drive', 'v3', credentials=creds)
-            
-            nombre_subcarpeta = MAPEO_CARPETAS_DRIVE.get(categoria_seleccionada, "General_y_Clinica")
-            
-            # Buscar la carpeta principal 'LIBROS GEM' y luego la subcarpeta
-            query_main = "name = 'LIBROS GEM' and mimeType = 'application/vnd.google-apps.folder'"
-            results_main = service.files().list(q=query_main, spaces='drive', fields='files(id, name)').execute()
-            folders_main = results_main.get('files', [])
-            
-            if folders_main:
-                id_main = folders_main[0]['id']
-                query_sub = f"'{id_main}' in parents and name = '{nombre_subcarpeta}' and mimeType = 'application/vnd.google-apps.folder'"
-                results_sub = service.files().list(q=query_sub, spaces='drive', fields='files(id, name)').execute()
-                folders_sub = results_sub.get('files', [])
-                
-                if folders_sub:
-                    id_sub = folders_sub[0]['id']
-                    # Listar los archivos bibliográficos de forma interna y privada
-                    query_files = f"'{id_sub}' in parents and trashed = false"
-                    results_files = service.files().list(q=query_files, spaces='drive', fields='files(id, name)').execute()
-                    files = results_files.get('files', [])
-                    
-                    titulos = [f"- {f['name']}" for f in files]
-                    if titulos:
-                        contexto_libros = f"\n[Base Bibliográfica Privada Verificada en Biblioteca Óptica Zerzer - Categoría {categoria_seleccionada}]:\n" + "\n".join(titulos)
-    except Exception as e:
-        # Modo de respaldo silencioso si la cuenta de servicio requiere configuración adicional
-        contexto_libros = f"\n[Motor Clínico Académico Óptica Zerzer - Resguardo basado en especialidad: {categoria_seleccionada}]"
-    
-    return contexto_libros
-
-def consultar_gemini_oficial(contents_input, api_key):
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(contents_input)
-        return response.text
-    except Exception as e:
-        return f"⚠️ Error de conexión con Google: {str(e)}"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -256,16 +206,11 @@ if validar_acceso():
         else:
             with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
                 
-                # Obtenemos de forma privada las referencias bibliográficas de las carpetas de Drive
-                referencias_bibliografia = obtener_contexto_bibliografico_drive(categoria)
-
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote estrictamente en los libros y protocolos bibliográficos especializados de la biblioteca de Óptica Zerzer.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote en los protocolos de la biblioteca clínica de Óptica Zerzer para el área de {categoria}.
 
                 Área Clínica Seleccionada: {categoria}
-                {referencias_bibliografia}
-
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
 
                 El informe debe redactarse con un tono formal, médico-optométrico y sumamente claro. Debe contener obligatoriamente:
@@ -281,7 +226,13 @@ if validar_acceso():
                         img = Image.open(img_file)
                         contents_input.append(img)
 
-                respuesta_modelo = consultar_gemini_oficial(contents_input, API_KEY_SECRETA)
+                try:
+                    genai.configure(api_key=API_KEY_SECRETA)
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content(contents_input)
+                    respuesta_modelo = response.text
+                except Exception as e:
+                    respuesta_modelo = f"⚠️ Error de conexión con Google: {str(e)}"
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -364,7 +315,7 @@ if validar_acceso():
 
         st.markdown("---")
         st.markdown("### 🔄 Debate y Seguimiento Continuo del Caso")
-        st.write("Escribí hier abajo con total comodidad y amplitud tus dudas, evolución o consultas de seguimiento para debatir con el asistente:")
+        st.write("Escribí aquí abajo con total comodidad y amplitud tus dudas, evolución o consultas de seguimiento para debatir con el asistente:")
 
         with st.form(key="form_seguimiento", clear_on_submit=True):
             pregunta_usuario = st.text_area(
@@ -390,7 +341,13 @@ if validar_acceso():
                     for msg in st.session_state.mensajes:
                         chat_history.append(msg["content"])
 
-                    respuesta_modelo = consultar_gemini_oficial(chat_history, API_KEY_SECRETA)
+                    try:
+                        genai.configure(api_key=API_KEY_SECRETA)
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        response = model.generate_content(chat_history)
+                        respuesta_modelo = response.text
+                    except Exception as e:
+                        respuesta_modelo = f"⚠️ Error de conexión: {str(e)}"
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
