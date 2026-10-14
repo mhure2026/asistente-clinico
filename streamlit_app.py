@@ -3,6 +3,8 @@ import re
 import base64
 import streamlit as st
 import google.generativeai as genai
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 from PIL import Image
 
 st.set_page_config(
@@ -29,6 +31,16 @@ try:
     API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
+
+# Mapeo exacto de tus carpetas bibliográficas en Google Drive
+MAPEO_CARPETAS_DRIVE = {
+    "🔬 Adaptación de Rígidas y Topografía": "Adaptacion_Rigidas_y_Topografia",
+    "🎯 Terapia Visual": "Terapia_Visual",
+    "👁️ Baja Visión": "Baja_Vision",
+    "👶 Pediatría": "Pediatria",
+    "🧠 Neurología": "Neurologia",
+    "📚 General y Clínica": "General_y_Clinica"
+}
 # ----------------------------------------------------
 
 # Estética y blindaje profesional
@@ -66,6 +78,42 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+def obtener_contexto_bibliografico_drive(categoria_seleccionada):
+    """Consulta de forma privada la biblioteca en Google Drive sin exponer los archivos."""
+    contexto_libros = f"[Biblioteca Privada Óptica Zerzer - Especialidad: {categoria_seleccionada}]"
+    try:
+        if "gcp_service_account" in st.secrets:
+            credentials_info = dict(st.secrets["gcp_service_account"])
+            creds = service_account.Credentials.from_service_account_info(
+                credentials_info, scopes=['https://www.googleapis.com/auth/drive.readonly']
+            )
+            service = build('drive', 'v3', credentials=creds)
+            nombre_subcarpeta = MAPEO_CARPETAS_DRIVE.get(categoria_seleccionada, "General_y_Clinica")
+            
+            # Buscar la carpeta LIBROS GEM
+            query_main = "name = 'LIBROS GEM' and mimeType = 'application/vnd.google-apps.folder'"
+            results_main = service.files().list(q=query_main, spaces='drive', fields='files(id, name)').execute()
+            folders_main = results_main.get('files', [])
+            
+            if folders_main:
+                id_main = folders_main[0]['id']
+                query_sub = f"'{id_main}' in parents and name = '{nombre_subcarpeta}' and mimeType = 'application/vnd.google-apps.folder'"
+                results_sub = service.files().list(q=query_sub, spaces='drive', fields='files(id, name)').execute()
+                folders_sub = results_sub.get('files', [])
+                
+                if folders_sub:
+                    id_sub = folders_sub[0]['id']
+                    query_files = f"'{id_sub}' in parents and trashed = false"
+                    results_files = service.files().list(q=query_files, spaces='drive', fields='files(id, name)').execute()
+                    files = results_files.get('files', [])
+                    
+                    titulos = [f"- {f['name']}" for f in files]
+                    if titulos:
+                        contexto_libros = f"Biblioteca Privada Óptica Zerzer (Libros de referencia para {categoria_seleccionada}:\n" + "\n".join(titulos)
+    except Exception:
+        pass
+    return contexto_libros
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -122,14 +170,7 @@ if validar_acceso():
         
         categoria = st.selectbox(
             "Área clínica a consultar:",
-            [
-                "🔬 Adaptación de Rígidas y Topografía",
-                "🎯 Terapia Visual",
-                "👁️ Baja Visión",
-                "👶 Pediatría",
-                "🧠 Neurología",
-                "📚 General y Clínica"
-            ]
+            list(MAPEO_CARPETAS_DRIVE.keys())
         )
         
         if st.session_state.categoria_anterior != categoria:
@@ -199,13 +240,18 @@ if validar_acceso():
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
         else:
-            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
+            with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía de Google Drive y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
                 
+                # Obtenemos el contexto bibliográfico conectado a tus 70 libros del Drive
+                referencias_libros = obtener_contexto_bibliografico_drive(categoria)
+
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote en los protocolos especializados de la biblioteca clínica de Óptica Zerzer.
+                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote estrictamente en los protocolos bibliográficos de la biblioteca de Óptica Zerzer.
 
                 Área Clínica Seleccionada: {categoria}
+                {referencias_libros}
+
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
 
                 El informe debe redactarse con un tono formal, médico-optométrico y sumamente claro. Debe contener obligatoriamente:
