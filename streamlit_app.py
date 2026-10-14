@@ -3,8 +3,7 @@ import re
 import base64
 import streamlit as st
 import google.generativeai as genai
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
+import gdown
 from PIL import Image
 
 st.set_page_config(
