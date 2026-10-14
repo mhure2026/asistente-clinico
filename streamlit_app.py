@@ -15,24 +15,18 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# CONFIGURACIÓN DE SEGURIDAD Y CREDENCIALES
+# 1. SEGURIDAD Y CREDENCIALES (Sin valores por defecto públicos)
 # ----------------------------------------------------
 try:
-    CLAVE_ACCESO = st.secrets["CLAVE_ACCESO"]
-except Exception:
-    CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
-
-try:
-    CLAVE_ADMIN = st.secrets.get("CLAVE_ADMIN", "zerzeradmin2026")
-except Exception:
-    CLAVE_ADMIN = os.environ.get("CLAVE_ADMIN", "zerzeradmin2026")
-
-try:
+    CLAVE_ACCESO = st.secrets.get("CLAVE_ACCESO", None)
+    CLAVE_ADMIN = st.secrets.get("CLAVE_ADMIN", None)
     API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
 except Exception:
-    API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
+    CLAVE_ACCESO = None
+    CLAVE_ADMIN = None
+    API_KEY_SECRETA = ""
 
-# Mapeo exacto de tus subcarpetas en la carpeta "LIBROS GEM" de Google Drive
+# Mapeo exacto de las subcarpetas en Google Drive dentro de "LIBROS GEM"
 MAPEO_CARPETAS_DRIVE = {
     "🔬 Adaptación de Rígidas y Topografía": "Adaptacion_Rigidas_y_Topografia",
     "🎯 Terapia Visual": "Terapia_Visual",
@@ -80,7 +74,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def obtener_contexto_bibliografico_drive(categoria_seleccionada):
-    """Consulta de forma privada la biblioteca en Google Drive sin exponer ni descargar los libros."""
+    """Conecta de forma privada con Google Drive para referenciar el contenido bibliográfico seguro."""
     contexto_libros = f"[Biblioteca Privada Óptica Zerzer - Especialidad: {categoria_seleccionada}]"
     try:
         if "gcp_service_account" in st.secrets:
@@ -91,7 +85,6 @@ def obtener_contexto_bibliografico_drive(categoria_seleccionada):
             service = build('drive', 'v3', credentials=creds)
             nombre_subcarpeta = MAPEO_CARPETAS_DRIVE.get(categoria_seleccionada, "General_y_Clinica")
             
-            # Buscar la carpeta LIBROS GEM
             query_main = "name = 'LIBROS GEM' and mimeType = 'application/vnd.google-apps.folder'"
             results_main = service.files().list(q=query_main, spaces='drive', fields='files(id, name)').execute()
             folders_main = results_main.get('files', [])
@@ -110,7 +103,7 @@ def obtener_contexto_bibliografico_drive(categoria_seleccionada):
                     
                     titulos = [f"- {f['name']}" for f in files]
                     if titulos:
-                        contexto_libros = f"Biblioteca Privada Óptica Zerzer (Libros de referencia para {categoria_seleccionada}:\n" + "\n".join(titulos)
+                        contexto_libros = f"Biblioteca Privada Óptica Zerzer (Referencias bibliográficas verificadas para {categoria_seleccionada}):\n" + "\n".join(titulos)
     except Exception:
         pass
     return contexto_libros
@@ -120,6 +113,11 @@ def validar_acceso():
         st.session_state.autenticado = False
     if "es_admin" not in st.session_state:
         st.session_state.es_admin = False
+
+    # Validación estricta: bloquea el ingreso si no hay claves configuradas en los Secrets
+    if not CLAVE_ACCESO or not CLAVE_ADMIN:
+        st.error("⚠️ Error de configuración de seguridad: Las claves de acceso no están definidas en los Secrets de Streamlit.")
+        return False
 
     if not st.session_state.autenticado:
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -242,7 +240,6 @@ if validar_acceso():
         else:
             with st.spinner(f"🔍 [Análisis Académico Profundo] Cruzando bibliografía de Google Drive y evaluando insumos para [{categoria}] (Esto puede demorar entre 1 y 3 minutos)..."):
                 
-                # Obtenemos el contexto bibliográfico conectado a tus 70 libros del Drive
                 referencias_libros = obtener_contexto_bibliografico_drive(categoria)
 
                 prompt_sistema = f"""
@@ -269,7 +266,8 @@ if validar_acceso():
 
                 try:
                     genai.configure(api_key=API_KEY_SECRETA)
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # Modelo actualizado a gemini-2.5-flash según recomendación
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     response = model.generate_content(contents_input)
                     respuesta_modelo = response.text
                 except Exception as e:
@@ -290,7 +288,6 @@ if validar_acceso():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-        # Generador de HTML limpio para descarga de PDF
         ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
         
         texto_limpio_html = ultimo_reporte
@@ -384,7 +381,7 @@ if validar_acceso():
 
                     try:
                         genai.configure(api_key=API_KEY_SECRETA)
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        model = genai.GenerativeModel('gemini-2.5-flash')
                         response = model.generate_content(chat_history)
                         respuesta_modelo = response.text
                     except Exception as e:
