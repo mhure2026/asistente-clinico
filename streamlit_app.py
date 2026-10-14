@@ -32,7 +32,7 @@ try:
 except Exception:
     API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
 
-# Mapeo exacto de tus carpetas bibliográficas en Google Drive
+# Mapeo exacto de tus subcarpetas en la carpeta "LIBROS GEM" de Google Drive
 MAPEO_CARPETAS_DRIVE = {
     "🔬 Adaptación de Rígidas y Topografía": "Adaptacion_Rigidas_y_Topografia",
     "🎯 Terapia Visual": "Terapia_Visual",
@@ -80,7 +80,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def obtener_contexto_bibliografico_drive(categoria_seleccionada):
-    """Consulta de forma privada la biblioteca en Google Drive sin exponer los archivos."""
+    """Consulta de forma privada la biblioteca en Google Drive sin exponer ni descargar los libros."""
     contexto_libros = f"[Biblioteca Privada Óptica Zerzer - Especialidad: {categoria_seleccionada}]"
     try:
         if "gcp_service_account" in st.secrets:
