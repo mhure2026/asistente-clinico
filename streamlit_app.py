@@ -380,7 +380,7 @@ if validar_acceso():
 
                     try:
                         genai.configure(api_key=API_KEY_SECRETA)
-                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        model = genai.GenerativeModel('gemini-3.8-flash')
                         response = model.generate_content(chat_history)
                         respuesta_modelo = response.text
                     except Exception as e:
