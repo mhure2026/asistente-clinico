@@ -1,7 +1,6 @@
 import os
-import time
-import base64
 import re
+import base64
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
@@ -22,9 +21,9 @@ except Exception:
     CLAVE_ACCESO = os.environ.get("CLAVE_ACCESO", "optica2026")
 
 try:
-    API_KEY_SECRETA = st.secrets["GEMINI_API_KEY"]
+    API_KEY_SECRETA = str(st.secrets["GEMINI_API_KEY"]).strip().strip('"\'')
 except Exception:
-    API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "")
+    API_KEY_SECRETA = os.environ.get("GEMINI_API_KEY", "").strip().strip('"\'')
 # ----------------------------------------------------
 
 # Estética y blindaje profesional
@@ -62,6 +61,16 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+def consultar_gemini_oficial(contents_input, api_key):
+    try:
+        genai.configure(api_key=api_key)
+        # Modelo oficial estable
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(contents_input)
+        return response.text
+    except Exception as e:
+        return f"⚠️ Error de conexión con Google: {str(e)}"
 
 def validar_acceso():
     if "autenticado" not in st.session_state:
@@ -136,7 +145,7 @@ if validar_acceso():
         st.markdown("### 📝 Datos Clínicos del Paciente")
         caso_texto = st.text_area(
             "Ingrese los parámetros y detalles extensos del caso:",
-            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual (podés escribir largo)...",
+            placeholder="Pegá aquí todos los datos, anamnesis, test optométricos o notas de terapia visual...",
             height=250,
             key="txt_caso"
         )
@@ -180,7 +189,7 @@ if validar_acceso():
     # ACCIÓN DE GENERAR REPORTE INICIAL
     if boton_analizar:
         if not API_KEY_SECRETA.strip():
-            st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+            st.warning("⚠️ No se detectó la clave de API configurada en Streamlit Secrets.")
         elif not imagenes_subidas and not caso_texto.strip():
             st.warning("⚠️ Por favor, suba al menos una fotografía o complete los datos clínicos del paciente.")
         else:
@@ -188,7 +197,7 @@ if validar_acceso():
                 
                 prompt_sistema = f"""
                 Actúa como un profesor universitario de optometría de máxima jerarquía internacional y optómetra clínico especialista experto en {categoria}.
-                Tu tarea es realizar un análisis exhaustivo, altamente detallado, estructurado y de rigor clínico absoluto para un colega profesional, basándote en los criterios científicos y la bibliografía especializada.
+                Tu tarea es realizar un análisis exhaustivo, highly detallado, estructurado y de rigor clínico absoluto para un colega profesional.
 
                 Área Clínica Seleccionada: {categoria}
                 Datos Clínicos Ingresados por el Optómetra: {caso_texto}
@@ -200,20 +209,13 @@ if validar_acceso():
                 4. 📅 **Control, Seguimiento y Pronóstico en Gabinete**: Pautado específico de revisiones y pronóstico visual esperado.
                 """
 
-                contents = [prompt_sistema]
+                contents_input = [prompt_sistema]
                 if imagenes_subidas:
                     for img_file in imagenes_subidas:
                         img = Image.open(img_file)
-                        contents.append(img)
+                        contents_input.append(img)
 
-                respuesta_modelo = None
-                try:
-                    genai.configure(api_key=API_KEY_SECRETA)
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(contents)
-                    respuesta_modelo = response.text
-                except Exception as e:
-                    respuesta_modelo = f"⚠️ Ocurrió un inconveniente temporal con la API de IA: {str(e)}"
+                respuesta_modelo = consultar_gemini_oficial(contents_input, API_KEY_SECRETA)
 
             if respuesta_modelo and not "⚠️" in respuesta_modelo:
                 st.session_state.mensajes.append({"role": "user", "content": f"Caso clínico presentado:\n{caso_texto}"})
@@ -230,7 +232,7 @@ if validar_acceso():
             with st.chat_message(mensaje["role"]):
                 st.markdown(mensaje["content"])
 
-        # Generador de HTML limpio para descarga de PDF al pie del reporte
+        # Generador de HTML limpio para descarga de PDF
         ultimo_reporte = st.session_state.mensajes[-1]["content"] if st.session_state.mensajes else ""
         
         texto_limpio_html = ultimo_reporte
@@ -308,7 +310,7 @@ if validar_acceso():
 
         if enviar_seguimiento and pregunta_usuario.strip():
             if not API_KEY_SECRETA.strip():
-                st.warning("⚠️ No se detectó la API Key en los secretos de Streamlit.")
+                st.warning("⚠️ No se detectó la clave de API.")
             else:
                 st.session_state.mensajes.append({"role": "user", "content": pregunta_usuario})
 
@@ -322,14 +324,7 @@ if validar_acceso():
                     for msg in st.session_state.mensajes:
                         chat_history.append(msg["content"])
 
-                    respuesta_modelo = None
-                    try:
-                        genai.configure(api_key=API_KEY_SECRETA)
-                        model = genai.GenerativeModel('gemini-1.5-flash')
-                        response = model.generate_content(chat_history)
-                        respuesta_modelo = response.text
-                    except Exception as e:
-                        respuesta_modelo = f"⚠️ Ocurrió un error temporal: {str(e)}"
+                    respuesta_modelo = consultar_gemini_oficial(chat_history, API_KEY_SECRETA)
 
                 if respuesta_modelo and not "⚠️" in respuesta_modelo:
                     st.session_state.mensajes.append({"role": "assistant", "content": respuesta_modelo})
